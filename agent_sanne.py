@@ -3,12 +3,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# For interactive Q&A
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationalRetrievalChain
+
 # To load the files from the folder
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders import NotebookLoader
 
 # To use the OpenAI LLM
 from langchain_openai import ChatOpenAI
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
 
 # To create a vector index of the split elements
 from langchain_community.vectorstores import FAISS
@@ -18,23 +25,41 @@ from langchain_community.embeddings import OpenAIEmbeddings
 from langchain.chains import RetrievalQA
 
 import os
+import glob
 
-print(os.getenv("OPENAI_API_KEY"))
+# print(os.getenv("OPENAI_API_KEY"))
 
 # Use the LLM from OpenAI
 llm = ChatOpenAI(model="gpt-4", temperature=0)
 
 
-# Adjust this to the relative or absolute path to the folder you want to load
-repo_path = "."  # or "." if you're in the same folder
+# "." since I am in the same folder
+repo_path = "."
 
-# Load all .py files from the folder
-loader = DirectoryLoader(repo_path, glob="**/*.py")
+# Load all .py files from the folder and to the directory
+loader_py = DirectoryLoader(repo_path, glob="**/*.py")
+docs_py = loader_py.load()
 
-# Load documents from that directory
-documents = loader.load()
+# Load all .md files from the folder and to the directory
+loader_md = DirectoryLoader(repo_path, glob="**/*.md")
+docs_md = loader_md.load()
 
-print(f"Loaded {len(documents)} documents")
+# Load .txt files
+loader_txt = DirectoryLoader(repo_path, glob="**/*.txt")
+docs_txt = loader_txt.load()
+
+# Load Jupyter notebooks
+notebook_paths = glob.glob(os.path.join(repo_path, "**/*.ipynb"), recursive=True)
+
+docs_ipynb = []
+for nb_path in notebook_paths:
+    loader_nb = NotebookLoader(nb_path)
+    docs_ipynb.extend(loader_nb.load())
+
+# Combine the loaded documents
+documents = docs_py + docs_md + docs_txt + docs_ipynb
+
+# print(f"Loaded {len(documents)} documents")
 
 # Optional: Split into chunks for better processing
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
@@ -44,14 +69,36 @@ docs_split = splitter.split_documents(documents)
 embedding = OpenAIEmbeddings()
 vectorstore = FAISS.from_documents(docs_split, embedding)
 
-print(f"Split into {len(docs_split)} chunks")
+# print(f"Split into {len(docs_split)} chunks")
 
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm, retriever=vectorstore.as_retriever(), chain_type="stuff"
+
+# Create a prompt template for the LLM, a code chain and an input
+
+"""
+prompt = PromptTemplate(
+    input_variables=["problem", "initial_state", "mixer"],
+    template=code_gen_template)
+    
+    
+
+code_chain = LLMChain(llm=llm, prompt=prompt)
+"""
+
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+qa_chain = ConversationalRetrievalChain.from_llm(
+    llm=llm, retriever=vectorstore.as_retriever(), memory=memory
 )
 
-query = "What does the main function in this repo do?"
-response = qa_chain.run(query)
+chat_history = []
 
-print("Answer:")
-print(response)
+while True:
+    query = input("Ask a question (or 'exit' to quit): ")
+    if query.lower() in ["exit", "quit"]:
+        print("Goodbye!")
+        break
+
+    result = qa_chain({"question": query})
+    print("\nAnswer:")
+    print(result["answer"])
+    print("-" * 40)
