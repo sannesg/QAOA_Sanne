@@ -221,3 +221,6 @@ Ask for extension:
         - Keep code Pythonic and readable.
 
         Optional: Include comments to explain steps.
+    
+        This is nearly always used in the context of initializing the problem (the class needed to make the QAOA instance) so unless the user
+        specifically asks to make only the graph, it should be put into context with the initializing the context and then creating the QAOA instance.
