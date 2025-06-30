@@ -210,7 +210,7 @@ Ask for extension:
 
 7. Additional packages and information that is needed to use QAOA
     7.1 Making graphs
-        Goal: I want to create and visualize graphs using NetworkX.
+        Goal: I want to create and visualize graphs using NetworkX. The graph is always a NetworkX graph and when generating code networkx should always be imported at the top of the code along with the other imports. 
 
         Requirements:
         - Use NetworkX (v3.2).
