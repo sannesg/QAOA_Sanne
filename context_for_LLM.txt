@@ -219,8 +219,11 @@ Ask for extension:
         - Also show how to create graphs from edge lists.
         - Use matplotlib for plotting.
         - Keep code Pythonic and readable.
+        - The graph is created using NetworkX.
+        - It is passed to a problem class, like MaxCutProblem(graph).
+        - That instance is passed to QAOA(problem_instance).
+        - Then qaoa.run() executes the algorithm.
 
         Optional: Include comments to explain steps.
     
-        This is nearly always used in the context of initializing the problem (the class needed to make the QAOA instance) so unless the user
-        specifically asks to make only the graph, it should be put into context with the initializing the context and then creating the QAOA instance.
+        Graphs are not used in isolation. They are always used as inputs to problem classes inside the problem folder, and those are then used as input to class QAOA.
