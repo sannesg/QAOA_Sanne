@@ -86,14 +86,8 @@ code_chain = LLMChain(llm=llm, prompt=prompt)
 
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
-with open("context_for_LLM.txt", "r") as f:
-    context_prompt = f.read()
-
 qa_chain = ConversationalRetrievalChain.from_llm(
-    llm=llm,
-    retriever=vectorstore.as_retriever(),
-    memory=memory,
-    chain_type_kwargs={"verbose": True, "system_message": context_prompt},
+    llm=llm, retriever=vectorstore.as_retriever(), memory=memory
 )
 
 chat_history = []
