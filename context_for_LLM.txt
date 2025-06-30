@@ -206,3 +206,18 @@ Ask for explanations:
 "Explain the difference between X-mixer and Grover-mixer."
 Ask for extension:
 "How do I add a new problem to the QAOA framework?"
+
+
+7. Additional packages and information that is needed to use QAOA
+    7.1 Making graphs
+        Goal: I want to create and visualize graphs using NetworkX.
+
+        Requirements:
+        - Use NetworkX (v3.2).
+        - Include examples with both directed and undirected graphs.
+        - Show how to add nodes and edges manually.
+        - Also show how to create graphs from edge lists.
+        - Use matplotlib for plotting.
+        - Keep code Pythonic and readable.
+
+        Optional: Include comments to explain steps.
