@@ -10,7 +10,7 @@ from langchain.chains import ConversationalRetrievalChain
 # To load the files from the folder
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import NotebookLoader
+from langchain_community.document_loaders import NotebookLoader
 
 # To use the OpenAI LLM
 from langchain_openai import ChatOpenAI
@@ -58,7 +58,7 @@ documents = docs_py + docs_md + docs_txt + docs_ipynb
 # print(f"Loaded {len(documents)} documents")
 
 # Optional: Split into chunks for better processing
-splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
 docs_split = splitter.split_documents(documents)
 
 # Turn the split documents into vectors
