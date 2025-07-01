@@ -14,7 +14,11 @@ from langchain_community.document_loaders import NotebookLoader
 
 # To use the OpenAI LLM
 from langchain_openai import ChatOpenAI
-from langchain.prompts import PromptTemplate
+from langchain.prompts import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
 
 # To create a vector index of the split elements
 from langchain_community.vectorstores import FAISS
@@ -55,7 +59,19 @@ for nb_path in notebook_paths:
 # Combine the loaded documents
 documents = docs_py + docs_md + docs_txt + docs_ipynb
 
-# print(f"Loaded {len(documents)} documents")
+# Loading the context_for_LLM.txt file as a string
+with open("context_for_LLM.txt", "r", encoding="utf-8") as f:
+    context_instructions = f.read()
+
+# Build a prompt template object with the context instructions
+prompt = ChatPromptTemplate.from_messages(
+    [
+        SystemMessagePromptTemplate.from_template(context_instructions),
+        HumanMessagePromptTemplate.from_template(
+            "Here is some additional context:\n{context}\n\nNow answer this question:\n{question}"
+        ),
+    ]
+)
 
 # Optional: Split into chunks for better processing
 splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
@@ -65,25 +81,13 @@ docs_split = splitter.split_documents(documents)
 embedding = OpenAIEmbeddings()
 vectorstore = FAISS.from_documents(docs_split, embedding)
 
-# print(f"Split into {len(docs_split)} chunks")
-
-
-# Create a prompt template for the LLM, a code chain and an input
-
-"""
-prompt = PromptTemplate(
-    input_variables=["problem", "initial_state", "mixer"],
-    template=code_gen_template)
-    
-    
-
-code_chain = LLMChain(llm=llm, prompt=prompt)
-"""
-
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 qa_chain = ConversationalRetrievalChain.from_llm(
-    llm=llm, retriever=vectorstore.as_retriever(), memory=memory
+    llm=llm,
+    retriever=vectorstore.as_retriever(),
+    memory=memory,
+    combine_docs_chain_kwargs={"prompt": prompt},
 )
 
 while True:

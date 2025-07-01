@@ -227,3 +227,16 @@ Ask for extension:
         Optional: Include comments to explain steps.
     
         Graphs are not used in isolation. They are always used as inputs to problem classes inside the problem folder, and those are then used as input to class QAOA.
+
+8. Implementation of qiskit
+    Objective: Minimize direct use of qiskit. Emphasize the usage of the QAOA package and its abstraction over qiskit.
+
+    Instructions:
+
+        - Use qiskit only when the QAOA package does not provide an equivalent function.
+
+        - If a feature or method exists in QAOA, prefer that over qiskit, even if it internally uses qiskit.
+
+        - Limit direct use of qiskit to the parameterization of quantum circuits, if not already handled by QAOA.
+
+    Rationale: This approach ensures the code demonstrates the capabilities and structure of the QAOA package, rather than relying heavily on raw qiskit functionality
