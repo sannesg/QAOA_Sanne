@@ -14,15 +14,11 @@ from langchain.document_loaders import NotebookLoader
 
 # To use the OpenAI LLM
 from langchain_openai import ChatOpenAI
-from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
 # To create a vector index of the split elements
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OpenAIEmbeddings
-
-# Connecting LLM to vectorstore for Q&A
-from langchain.chains import RetrievalQA
 
 import os
 import glob
@@ -33,14 +29,14 @@ import glob
 llm = ChatOpenAI(model="gpt-4", temperature=0)
 
 
-# "." since I am in the same folder
+# "." because the files are in the same folder
 repo_path = "."
 
-# Load all .py files from the folder and to the directory
+# Load all .py files
 loader_py = DirectoryLoader(repo_path, glob="**/*.py")
 docs_py = loader_py.load()
 
-# Load all .md files from the folder and to the directory
+# Load all .md files
 loader_md = DirectoryLoader(repo_path, glob="**/*.md")
 docs_md = loader_md.load()
 
@@ -48,7 +44,7 @@ docs_md = loader_md.load()
 loader_txt = DirectoryLoader(repo_path, glob="**/*.txt")
 docs_txt = loader_txt.load()
 
-# Load Jupyter notebooks
+# Load .iptnb files
 notebook_paths = glob.glob(os.path.join(repo_path, "**/*.ipynb"), recursive=True)
 
 docs_ipynb = []
@@ -89,8 +85,6 @@ memory = ConversationBufferMemory(memory_key="chat_history", return_messages=Tru
 qa_chain = ConversationalRetrievalChain.from_llm(
     llm=llm, retriever=vectorstore.as_retriever(), memory=memory
 )
-
-chat_history = []
 
 while True:
     query = input("Ask a question (or 'exit' to quit): ")
