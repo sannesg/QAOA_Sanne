@@ -87,7 +87,7 @@ Example of CASE 0:
  - IF the USER asks for a cost landscape, include steps 10-12.
 
 --- CASE 2: Generate a plan to explain the QAOA package.
-2. If the USER asks for an explanation about the QAOA package, generate a concise list of components. 
+2. If the USER asks for an explanation about the QAOA package, generate a concise TWO-WORD list of components. It should be written as bullet points.
  - Title of the list is ALWAYS "Plan over which components of the QAOA package to explain".
  - Use this case if: "explain", "explanation", "components", "parts", or "structure" is in the description and "code" or "implementation" is not.
  - Include only the components that are relevant to the USER's request.
@@ -98,7 +98,7 @@ Example of CASE 0:
          - Mixers classes
          - Initial states classes
 
- - IF the USER ONLY asks for a specific class, method, or variable, then ONLY include that class, method, or variable in the list you generate.
+ - IF the USER ONLY asks for a specific class, method, or variable, then ONLY include that class, method, or variable in the list you generate. It does not need to be in the context to be included.
 
 Strictly follow these rules:  
  - Output ONLY the numbered list of steps or the list of components.  
@@ -133,5 +133,5 @@ Remember: Be concise, focused, and precise.
 
 # Example usage:
 planner = Planner()
-result = planner("could you explain the overall structure of the QAOA package?")
+result = planner("could you what the maxkcut classes do?")
 print(result)

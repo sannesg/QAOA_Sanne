@@ -21,6 +21,33 @@ def extract_docstrings_from_documents(docs):
     return extracted_docs
 
 
+"""
+import ast
+from langchain.schema import Document  # Assuming you're using LangChain's Document
+
+def extract_class_docstrings_from_documents(docs):
+    extracted_docs = []
+
+    for doc in docs:
+        try:
+            tree = ast.parse(doc.page_content)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    docstring = ast.get_docstring(node)
+                    if docstring:
+                        extracted_docs.append(
+                            Document(page_content=docstring.strip(), metadata=doc.metadata)
+                        )
+        except SyntaxError:
+            # Skip documents that can't be parsed
+            continue
+
+    return extracted_docs
+
+# Returns only the docstrings of classes from the documents.
+"""
+
+
 # ----- To load the files from the folder ------
 def load_python_files(repo_path):
     """
