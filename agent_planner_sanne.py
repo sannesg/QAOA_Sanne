@@ -16,6 +16,18 @@ from langchain.agents import (
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+from langchain.chains import RetrievalQA
+
+# to make the code splitter
+import re
+from langchain_core.documents import Document
+
+# To load the files from the folder
+from langchain_community.document_loaders import DirectoryLoader
+
+# To create a vector index of the split elements
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import OpenAIEmbeddings
 
 
 # ----- Define placeholder tools (for future use) -----
@@ -102,6 +114,41 @@ code_agent = initialize_agent(
     tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True
 )
 
+
+# ----- Making the Code Splitter -----
+def extract_docstrings_from_documents(docs):
+    docstring_pattern = r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')'
+    extracted_docs = []
+
+    for doc in docs:
+        matches = re.findall(docstring_pattern, doc.page_content)
+        for match in matches:
+            extracted_docs.append(
+                Document(page_content=match.strip(), metadata=doc.metadata)
+            )
+
+    return extracted_docs
+
+
+# "." because the files are in the same folder
+repo_path = "./qaoa"
+
+# Load all .py files
+loader_py = DirectoryLoader(repo_path, glob="**/*.py")
+docs_py = loader_py.load()
+
+docstring_docs = extract_docstrings_from_documents(docs_py)
+
+# making an embedding and vectorstore
+embedding = OpenAIEmbeddings()
+vectorstore = FAISS.from_documents(docstring_docs, embedding)
+
+retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4})
+
+rag_chain = RetrievalQA.from_chain_type(
+    llm=llm, retriever=retriever, chain_type="stuff"
+)
+
 # ----- Main loop -----
 while True:
     query = input("Ask a question (or 'exit' to quit): ")
@@ -109,7 +156,8 @@ while True:
         print("Goodbye!")
         break
 
-    plan = planner_chain.run({"description": query})
+    # plan = planner_chain.run({"description": query})
+    plan = rag_chain.run(query)
     print("\nPlan:")
     print(plan)
     print("-" * 40)
