@@ -5,6 +5,9 @@ from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 
+import ast
+from langchain.schema import Document
+
 
 # ----- Making the Code Splitter -----
 def extract_docstrings_from_documents(docs):
@@ -21,10 +24,7 @@ def extract_docstrings_from_documents(docs):
     return extracted_docs
 
 
-"""
-import ast
-from langchain.schema import Document  # Assuming you're using LangChain's Document
-
+# ----- Extracting class docstrings from documents -----
 def extract_class_docstrings_from_documents(docs):
     extracted_docs = []
 
@@ -36,16 +36,14 @@ def extract_class_docstrings_from_documents(docs):
                     docstring = ast.get_docstring(node)
                     if docstring:
                         extracted_docs.append(
-                            Document(page_content=docstring.strip(), metadata=doc.metadata)
+                            Document(
+                                page_content=docstring.strip(), metadata=doc.metadata
+                            )
                         )
-        except SyntaxError:
-            # Skip documents that can't be parsed
+        except SyntaxError:  # Skip documents that can't be parsed
             continue
 
     return extracted_docs
-
-# Returns only the docstrings of classes from the documents.
-"""
 
 
 # ----- To load the files from the folder ------
