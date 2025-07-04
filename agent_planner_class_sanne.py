@@ -2,12 +2,10 @@ from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
-# ----- Helper imports -----
-from agent_utils import (
-    extract_docstrings_from_documents,
-    load_python_files,
-    creating_vectorstore,
-)
+# ----- Class imports -----
+from agent_explainer_class import Explainer
+
+# from agent_coder_dina import CodeAssistant
 
 
 class Planner:
@@ -88,15 +86,20 @@ Example of CASE 0:
 
 --- CASE 2: Generate a plan to explain the QAOA package.
 2. If the USER asks for an explanation about the QAOA package, generate a concise TWO-WORD list of components. It should be written as bullet points.
- - Title of the list is ALWAYS "Plan over which components of the QAOA package to explain".
+ - Title of the list is either "Plan over which components of the QAOA package to explain" or "Plan for explaination of structures and relationships in the QAOA package".
  - Use this case if: "explain", "explanation", "components", "parts", or "structure" is in the description and "code" or "implementation" is not.
  - Include only the components that are relevant to the USER's request.
    
-   Template for some the components that can be relevant:
+   Some the components that can be relevant:
          - QAOA class
          - Problems classes
          - Mixers classes
          - Initial states classes
+
+    If the USER asks for a "structure", "relation", "relationship", "overview" or "hierarchy" of the QAOA package then it can be relevant to include:
+         - structure
+         - relation
+         - overview
 
  - IF the USER ONLY asks for a specific class, method, or variable, then ONLY include that class, method, or variable in the list you generate. It does not need to be in the context to be included.
 
@@ -131,7 +134,23 @@ Remember: Be concise, focused, and precise.
             self.context1 = "No context available."
 
 
-# Example usage:
-planner = Planner()
-result = planner("could you what the maxkcut classes do?")
-print(result)
+while True:
+    query = input("Ask a question (or 'exit' to quit): ")
+    if query.lower() in ["exit", "quit"]:
+        print("Goodbye!")
+        break
+
+    planner = Planner()
+    result = planner(query)
+    if "case 1" or "case 0" in result.lower():
+        print("\n\n\n\Plan:\n\n\n", result)
+        explainer = Explainer(result)
+        response = explainer.explain()
+    else:
+        # coder = CodeAssistant()
+        # response = coder.generate_and_test_code(result)
+        response = result
+
+    print("\nAnswer:")
+    print(response)
+    print("-" * 40)

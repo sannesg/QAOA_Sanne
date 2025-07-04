@@ -3,14 +3,12 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
 # ----- Helper imports -----
-from agent_utils import (
-    extract_docstrings_from_documents,
-    load_python_files,
-    creating_vectorstore,
-)
+from agent_utils import extract_class_docstrings_from_documents, load_python_files
 
+"""
 # ----- To test Explainer with Planner -----
 from agent_planner_class_sanne import result
+"""
 
 
 class Explainer:
@@ -30,13 +28,13 @@ class Explainer:
         self.prompt = PromptTemplate(
             input_variables=["description", "context"],
             template="""
-        You are an expert on the QAOA package. You get a list over what you want to explain (they can be for example classes, methods, etc.) and you are going to explain how they work and what attributes, args, and returns they have.
+        You are an expert on the QAOA package. You get a list over what the USER wants you to explain (they can be for example classes, methods, etc.) and you are going to explain how they work and what attributes, args, and returns they have.
         
         The parts you want to explain are: {description}
         Your context is the documentation strings for the code: {context}
         
         Make it helpful so that the USER understand the overall meaning of the parts of the package and also how it is used in a code. 
-        If you are explaining a method, include the class it belongs to. If you are explaining a class, include its methods and attributes. If you are explaining a variable, include its type and purpose.
+        If you are explaining a method, include the class it belongs to. If you are explaining a class, include its methods and attributes there are any. If you are explaining a variable, include its type and purpose.
         Be concise and structured. 
         Do not include anything the USER has not asked for.
         """,
@@ -47,18 +45,11 @@ class Explainer:
         """Set or update the context variable with documentation."""
         repo_path = "./qaoa"
         docs_py = load_python_files(repo_path)
-        extracted_docs_py = extract_docstrings_from_documents(docs_py)
+        extracted_docs_py = extract_class_docstrings_from_documents(docs_py)
 
-        # only keep docstrings that contain specific keywords
-        keywords = ["Args", "Attributes", "Returns", "Raises", "Example", "Class"]
         all_docstrings = [
             doc.page_content if hasattr(doc, "page_content") else str(doc)
             for doc in extracted_docs_py
-            if any(
-                keyword
-                in (doc.page_content if hasattr(doc, "page_content") else str(doc))
-                for keyword in keywords
-            )
         ]
 
         chunks = []
@@ -82,6 +73,8 @@ class Explainer:
         return result.get("text", result)
 
 
+"""
 explainer = Explainer(result)
 explanation = explainer.explain()
 print("\n\nExplanation:\n\n", explanation)
+"""
