@@ -2,6 +2,8 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+from agent_utils import *
+
 import json
 import re
 from pathlib import Path
@@ -37,7 +39,7 @@ class CodeAssistant:
             
         self._initialize_agent()
         
-    @tool
+    # @tool
     def execute_code(code: str) -> str:
         """Executes the provided Python code and returns only error messages if any occur."""
         try:
@@ -69,22 +71,22 @@ class CodeAssistant:
                 print(f"File not found - {path}. Skipping.")
                 continue
             if path.suffix == ".ipynb":
-                documents.extend(self._load_notebook(path))
+                documents.append(self._load_notebook(path))
             elif path.suffix in [".txt", ".md"]:
-                documents.extend(self._load_text_file(path))
+                documents.append(self._load_text_file(path))
             elif path.suffix == ".py":
-                py_docs = self._load_python_script(path)
-                docstring_docs = self._extract_docstrings_from_documents(py_docs)
-                documents.extend(docstring_docs)
+                py_str = self._load_python_script(path)
+                docstring_str = self._extract_docstrings_from_documents(py_str)
+                documents.append(docstring_str)
             else:
                 print(f"Unsupported file type - {path.suffix}. Skipping.")
             
         print(f"Loaded {len(documents)} documents.")
-
-        if documents:
-            self._process_documents(documents)
+        return documents
+        # if documents:
+        #     self._process_documents(documents)
             
-    def _load_notebook(self, path: Path) -> List[Document]:
+    def _load_notebook(self, path: Path) -> str:
         """Load Jupyter notebook content."""
         with open(path, "r", encoding="utf-8") as f:
             notebook = json.load(f)
@@ -95,22 +97,21 @@ class CodeAssistant:
                 cell_content = "\n".join(cell["source"])
                 content.append(cell_content)
                 # print(f"Loaded cell content:\n{cell_content}\n{'-'*50}")
+        return "\n\n".join(content)
+        # return [Document(page_content="\n\n".join(content))]
         
-        return [Document(page_content="\n\n".join(content))]
     
-    def _load_python_script(self, path: Path) -> List[Document]:
+    def _load_python_script(self, path: Path) -> str:
         """Load Python script content."""
         with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-        
-        return [Document(page_content=content)]
+            return f.read()
+        # return [Document(page_content=content)]
     
-    def _load_text_file(self, path: Path) -> List[Document]:
+    def _load_text_file(self, path: Path) -> str:
         """Load text or markdown file content."""
         with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-        
-        return [Document(page_content=content)]
+            return f.read()
+        # return [Document(page_content=content)]
 
     def _extract_docstrings_from_documents(self, docs: List[Document]) -> List[Document]:
         docstring_pattern = r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')'
@@ -168,8 +169,8 @@ Execution Guidelines:
 - Don't comment on it if the code doesn't return anything
 """
 )
-        if not self.vectorstore:
-            print("Vectorstore is not initialized. Retrieval-based QA will not work.")
+        # if not self.vectorstore:
+        #     print("Vectorstore is not initialized. Retrieval-based QA will not work.")
 
         # Create retrieval chain for code suggestion
         self.qa_chain = ConversationalRetrievalChain.from_llm(
@@ -179,25 +180,25 @@ Execution Guidelines:
             combine_docs_chain_kwargs={"prompt": code_suggestion_prompt},
         )
 
-        # Create agent for code testing/execution
-        self.agent = initialize_agent(
-            tools=self.tools,
-            llm=self.llm,
-            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-            verbose=True,
-            return_intermediate_steps=True,
-            handle_parsing_errors=True,
-            max_iterations=3,
-            agent_kwargs={
-                'prefix': """You are a coding assistant that executes Python code. When testing code:
-        1. Always use the execute_code tool
-        2. If output starts with "SUCCESS", the code worked
-        3. If output starts with "ERROR", analyze the error type and message
-        4. Never show circuit diagrams or verbose output"""
-            }
-        )
+        # # Create agent for code testing/execution
+        # self.agent = initialize_agent(
+        #     tools=self.tools,
+        #     llm=self.llm,
+        #     agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+        #     verbose=True,
+        #     return_intermediate_steps=True,
+        #     handle_parsing_errors=True,
+        #     max_iterations=3,
+        #     agent_kwargs={
+        #         'prefix': """You are a coding assistant that executes Python code. When testing code:
+        # 1. Always use the execute_code tool
+        # 2. If output starts with "SUCCESS", the code worked
+        # 3. If output starts with "ERROR", analyze the error type and message
+        # 4. Never show circuit diagrams or verbose output"""
+        #     }
+        # )
     
-    def generate_and_test_code(self, query: str, max_iterations: int = 3) -> str:
+    def generate_and_test_code(self, query: str, max_iterations: int = 3) -> None:
         """Generate code, test it, and improve based on feedback."""
         current_code = None
         last_error = None
@@ -212,7 +213,7 @@ Execution Guidelines:
             else:
                 print("Improving code based on last error...")
                 result = self.qa_chain.invoke({
-                    "question": f"Fix this code that failed with error: {last_error}\nOriginal task: {query}\nCode:\n{current_code}"
+                    "question": f"Fix this code that failed with error: {error_analysis}\nOriginal task: {query}\nCode:\n{current_code}"
                 }) 
                 
             current_code = result["answer"]
@@ -221,23 +222,36 @@ Execution Guidelines:
             print(current_code)
             
             # Test code execution
-            execution_result = self.agent.invoke({
-                "input": f"Execute and validate this code and report any errors:\n{current_code}"
-            })
+            # execution_result = self.agent.invoke({
+            #     "input": f"Execute and validate this code and report any errors:\n{current_code}"
+            # })
             
-            last_error = execution_result["output"]
+            if "```python" in current_code:
+                execution_result = self.execute_code(current_code)
+                print("\nExecution Result:")
+                print(execution_result)
+                if "ERROR" in execution_result:
+                    result = self.qa_chain.invoke(f"The code {self._extract_code_block(current_code)} has the following error: {execution_result}. Make a comment on the error and what improvements should be made to the code.")
+                    error_analysis = result["answer"]
+                    print("\nError Analysis:")
+                    print(error_analysis)
+                else:
+                    return current_code
+            
+            # last_error = execution_result["output"]
 
-            print("\nExecution result:")
-            print(last_error)
+            # print("\nExecution result:")
+            # print(last_error)
 
-            steps = execution_result.get("intermediate_steps", [])
-            for action, observation in steps:
-                if isinstance(observation, str) and "SUCCESS" in observation:
-                    print("Code executed successfully!")
-                    return self._extract_code_block(current_code)
+            # steps = execution_result.get("intermediate_steps", [])
+            # for action, observation in steps:
+            #     if isinstance(observation, str) and "SUCCESS" in observation:
+            #         print("Code executed successfully!")
+            #         return self._extract_code_block(current_code)
         
         print(f"\nReached maximum iterations ({max_iterations})")
-        return self._extract_code_block(current_code)
+        # return self._extract_code_block(current_code)
+        return current_code
 
     def _extract_code_block(self, text: str) -> str:
         """Extract code from markdown block."""
