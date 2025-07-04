@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Union, Optional
 import io
 import sys
 from contextlib import redirect_stdout
+import traceback
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
@@ -36,21 +37,6 @@ class CodeAssistant:
             
         self._initialize_agent()
         
-    # @tool
-    # def execute_code(code: str) -> str:
-    #     """Executes the provided Python code and returns the result or error."""
-    #     try:
-    #         # Remove Markdown code fences if present
-    #         code = re.sub(r"^```(?:python)?", "", code.strip(), flags=re.IGNORECASE)
-    #         code = re.sub(r"```$", "", code.strip())
-
-    #         exec_globals = {}
-    #         exec(code.strip(), exec_globals)
-    #         output = exec_globals.get('result', 'Code executed successfully with no errors')
-    #         return f"SUCCESS: {output}"
-    #     except Exception as e:
-    #         import traceback
-    #         return f"ERROR: {traceback.format_exc()}"
     @tool
     def execute_code(code: str) -> str:
         """Executes the provided Python code and returns only error messages if any occur."""
@@ -71,7 +57,6 @@ class CodeAssistant:
             return "SUCCESS: Code executed without errors"
             
         except Exception as e:
-            import traceback
             # Return just the error type and message, not full traceback
             return f"ERROR: {type(e).__name__}: {str(e)}"
 
@@ -228,7 +213,7 @@ Execution Guidelines:
                 print("Improving code based on last error...")
                 result = self.qa_chain.invoke({
                     "question": f"Fix this code that failed with error: {last_error}\nOriginal task: {query}\nCode:\n{current_code}"
-                })
+                }) 
                 
             current_code = result["answer"]
             
@@ -265,25 +250,8 @@ Execution Guidelines:
 context_files = ["./examples/MaxCut/KCutExamples.ipynb", "./examples/MaxCut/ToyExample.ipynb"]
 assistant = CodeAssistant(context_files)
 
-query = "Create a QAOA instance for a random graph with k=2 using the Dina initial state. You dont have to visualize anything or run any optimization."
+query = "Create a qaoa instance usinga random graph with 8 nodes for k = 2."
 
 final_code = assistant.generate_and_test_code(query)
 print("\nFinal Code:")
 print(final_code)
-
-# context_files = ["./examples/MaxCut/KCutExamples.ipynb", "./examples/MaxCut/ToyExample.ipynb"]
-
-# assistant = CodeAssistant(context_files)
-
-# query = "Create a QAOA instance for a random graph with k=2 using the equal superposition initial state. You dont have to visualize anything."
-
-# result = assistant.qa_chain({"question": query})
-
-# suggested_code = result["answer"]
-
-# print("\nSuggested Code:")
-# print(suggested_code)
-
-# answer = assistant.agent.run(f"Please run the following code and report any errors:\n\n{suggested_code}")
-# print("\nExecution Result:")
-# print(answer)
