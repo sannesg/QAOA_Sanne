@@ -18,7 +18,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from langchain.tools import tool
 from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
+from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory, ConversationSummaryBufferMemory
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document
 
@@ -33,11 +33,12 @@ class CodeAssistant:
     def __init__(self, context_files: Optional[list[Union[str, Path]]]=None):
         self.llm = ChatOpenAI(model="gpt-4", temperature=0)
         self.tools = [self.execute_code]
-        self.memory = ConversationSummaryMemory(
-            llm=self.llm,  # you must pass an LLM to generate summaries
-            memory_key="chat_history",
+        self.memory = ConversationSummaryBufferMemory(
+            llm=self.llm,
+            memory_key="chat_history", # See prompt template for usage
             input_key="question",
-            return_messages=True
+            return_messages=True,
+            max_token_limit=1000,  # Limit memory size to avoid excessive context
         )
         self.vectorstore = None
         if context_files:
@@ -45,7 +46,7 @@ class CodeAssistant:
             
         self._initialize_agent()
         
-    # @tool
+    # @tool We don't use this as a tool anymore to save on API calls
     def execute_code(self, code: str) -> str:
         """Executes the provided Python code and returns only error messages if any occur."""
         try:
@@ -54,7 +55,6 @@ class CodeAssistant:
             code = re.sub(r"```$", "", code.strip())
 
             # Redirect stdout to suppress circuit diagrams
-
             exec_globals = {}
             f = io.StringIO()
             
@@ -72,13 +72,13 @@ class CodeAssistant:
         """Process and store documents in vectorstore."""
         docs_str = agent_utils.load_context(paths)
         
-        print(f"Processing {len(docs_str)} raw documents")
+        print(f"Processing {len(docs_str)} raw documents.")
         try:
             docs = [Document(page_content=doc.strip()) for doc in docs_str]
         
             splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
             split_docs = splitter.split_documents(docs)
-            print(f"Number of split documents: {len(split_docs)}.")
+            print(f"Generated {len(split_docs)} split documents.")
         
             if not split_docs:
                 print("No documents to process after splitting. Skipping vectorstore creation.")
@@ -100,25 +100,26 @@ class CodeAssistant:
         
         code_suggestion_prompt = PromptTemplate(
             input_variables=["context", "question"],
-            template="""You are a Python coding assistant. 
+            template="""You are a AI, a Python coding assistant. 
             
-You have three tasks based on the input:
+You have four tasks based on the input:
 
 1. If asked a query with no error information, generate Python code to solve the task.
 2. If provided with an error message, analyze the error and suggest improvements to the code without generating new code.
 3. If asked to improve code based on suggestions, generate improved Python code considering the provided feedback.
+4. If an explaination is requested, provide a concise explanation.
 
 Context:
 {context}
 
-Chat History:
+Conversation history:
 {chat_history}
 
-Task:
-{question}
+Human: {question}
+AI:
 
 Guidelines:
-1. Generate Python code to solve the task
+1. Generate Python code to solve the task provided by the Human.
 2. The code should be complete and executable
 3. The code should include all necessary imports and mainly use the QAOA package
 4. The code should be formatted in markdown with ```python code fences
@@ -127,22 +128,10 @@ Guidelines:
 7. Phrase all responses as if it is the first response to the user.
 8. After generating code, briefly explain the approach and any potential limitations in the code or discrepancies between the code and the task.
 9. For parts of the task that are unspecified, provide brief reasoning for your choices.
+10. You may refer to previous tasks and responses in the conversation to maintain context and continuity.
 """
-)
-        # self.qa_chain = RetrievalQA.from_chain_type(
-        #     llm = self.llm,
-        #     chain_type="stuff",
-        #     retriever=self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4}) if self.vectorstore else None,
-        #     chain_type_kwargs={
-        #         "prompt": code_suggestion_prompt,
-        #         # "document_variable_name": "context"
-        #     },
-        #     input_key="question",
-        #     output_key="answer",
-        #     return_source_documents=True
-        #     )
-        
-        # Using memory
+)       
+        # Initialize chain that handles memory
         self.qa_chain = ConversationalRetrievalChain.from_llm(
             llm=self.llm,
             retriever=self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4}) if self.vectorstore else None,
@@ -152,6 +141,7 @@ Guidelines:
             }
         )
     
+    # Main function
     def generate_and_test_code(self, query: str, max_iterations: int = 3) -> None:
         """Generate code, test it, and improve based on feedback."""
         current_code = None
@@ -159,26 +149,25 @@ Guidelines:
         # last_error = None
         
         for iteration in range(max_iterations):
-            print(f"\n--- Iteration {iteration + 1} ---")
+            print(f"\033[90m\n--- Iteration {iteration + 1} ---\033[0m")
             
-            # Generate or improve code
+            # Generate new or improve old code
             if current_code is None:
-                print("\nGenerating initial response...")
+                print("\033[90m\nGenerating initial response...\033[0m")
                 result = self.qa_chain.invoke({
-                    # "context": self.context, 
                     "question": query})
             else:
-                print("\nImproving response based on previous error...")
+                print("\033[90m\nImproving response based on previous error...\033[0m")
                 result = self.qa_chain.invoke({
-                    # "context": self.context,
                     "question": f"Improve this code based on the following feedback: {error_analysis}\nOriginal task: {query}\nCode:\n{self._extract_code_block(current_code)}"
                 }) 
                 
-            current_code = result["answer"]
+            current_code = result["answer"] # Extract response text
             
-            print("\nResponse:")
-            print(f"\n{current_code}")
+            print("\033[90m\nResponse:\033[0m")
+            print(f"\033[90m\n{current_code}\033[0m")
             
+            # Execute the code if it contains a code block
             if "```" in current_code:
                 matplotlib.use("Agg")  # Use a non-interactive backend for matplotlib (no verbose output in console)
                 print("\033[96m\nExecuting code...\033[0m")
@@ -188,20 +177,18 @@ Guidelines:
                 if "ERROR" in execution_result:
                     print(f"\033[96m\nGenerating error analysis\033[0m")
                     result = self.qa_chain.invoke({
-                        # "context": self.context, 
                         "question": f"""Analyze the following error: {execution_result}. 
-                        Provide suggestions for imporving the code without generating new code."""})
+                        Provide suggestions for improving the code without generating new code."""})
                     error_analysis = result["answer"]
                     print(f"\033[96mError analysis: {error_analysis}\033[0m")
                 else:
-                    return current_code
+                    return current_code # Return the response if no errors occurred
                 
             else:
                 return current_code
         
         print(f"\nReached maximum iterations ({max_iterations})")
-        # return self._extract_code_block(current_code)
-        return current_code
+        return current_code # Return the last generated response when max tries are reached
 
     def _extract_code_block(self, text: str) -> str:
         """Extract code from markdown block."""
@@ -214,7 +201,7 @@ Guidelines:
 context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
 assistant = CodeAssistant(context_files)
 
-# # query = "Create a random connected graph with 10 nodes. Include visualization."
+# query = "Create a random connected graph with 10 nodes. Include visualization."
 # query = "Create a qaoa instance using onehot encoding."
 
 # final_code = assistant.generate_and_test_code(query)
@@ -227,14 +214,16 @@ print("\nFirst query: ")
 print(f"\033[1m{query1}\033[0m")
 final_code1 = assistant.generate_and_test_code(query1)
 print("\nFinal response to first query:")
-print(f"\033[1m\n{final_code1}\033[0m")
+print(f"\033[1m{final_code1}\033[0m")
 
-# # Second query relies on memory of the first one
-# query2 = "Can you explain why you used onehot encoding?"
-# print("\n--- Second Query ---")
-# final_response2 = assistant.qa_chain.invoke({"question": query2})
-# print("\nFinal response to second query:")
-# print(final_response2["answer"])
+# Second query relies on memory of the first one
+query2 = "What did I just ask?"
+print("\nSecond query: ")
+print(f"\033[1m{query2}\033[0m")
+final_response2 = assistant.qa_chain.invoke({"question": query2})
+print("\nFinal response to second query:")
+print(f"\033[1m{final_response2["answer"]}\033[0m")
 
-# print("\n--- Memory Summary ---")
-# print(assistant.memory.buffer) 
+# Print memory summary
+print("\nMemory summary:")
+print(assistant.memory.buffer) 

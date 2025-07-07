@@ -120,5 +120,5 @@ def load_context(paths: List[str]) -> None:
         else:
             print(f"Unsupported file type - {path.suffix}. Skipping.")
 
-    print(f"Loaded {len(context)} files.")
+    print(f"\nLoaded {len(context)} files.")
     return context
