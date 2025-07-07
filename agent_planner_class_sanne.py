@@ -1,13 +1,12 @@
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+from langchain.memory import ConversationBufferMemory
 
-# ----- Helper imports -----
-from agent_utils import (
-    extract_docstrings_from_documents,
-    load_python_files,
-    creating_vectorstore,
-)
+
+# ----- Class imports -----
+from agent_explainer_class import Explainer
+from agent_coder_dina import CodeAssistant
 
 
 class Planner:
@@ -33,10 +32,13 @@ class Planner:
             temperature (float): The temperature for the language model. Default is 0.
         """
         self.llm = ChatOpenAI(model=model, temperature=temperature)
+        self.memory = ConversationBufferMemory(
+            memory_key="chat_history", input_key="description"
+        )
         self.context = ""
         self.set_context()
         self.prompt = PromptTemplate(
-            input_variables=["description", "context"],
+            input_variables=["description", "context", "chat_history"],
             template="""
 You are an expert in the QAOA Python package and a code assistant to the USER. Your task is to create a plan (a prompt) for another AGENT to follow.
 
@@ -45,6 +47,8 @@ You have access to the following context: {context}, which contains the valid op
     2. Valid Mixers
     3. Valid Problems
 
+You have also access to the chat history: {chat_history}
+
 Given the USER's input: "{description}":
 
 ***** RULES *****
@@ -52,6 +56,7 @@ ONLY do 1 of the following 3 cases:
 --- CASE 0: Validate USER input with the context.
     - If any USER-specified initial state, problem, or mixer is NOT an exact match with an option in {context}. Then:
      - Respond ONLY with: "The [initial state/problem/mixer] '[name]' is not a valid option based on the documentation."
+     - Also include the list of valid options for the QAOA package.
      - Do NOT generate anything else, no code, no plans, no other explanations.
      - You will not use a template for this case, but rather a direct response.
     - Else, continue to the next case.
@@ -75,30 +80,29 @@ Example of CASE 0:
         4. Choose the mixer.
         5. Choose the initial state. 
         6. Create an instance of the QAOA class with the chosen initial state, problem, and mixer.
-        7. Create parametrized circuits using the QAOA instance. Default to depth=1 if not specified.
-        8. Draw graph using networkx.
-        9. Draw quantum circuit using qaoa.draw_circuit().
-        10. Use qaoa.sample_cost_landscape() to sample the cost landscape. Default parameters: angles= gamma: [-np.pi / 2, np.pi / 2, 15], beta: [1, 1 + 2 * np.pi, 15] in a library if not specified.
-        11. Plot the cost landscape using plot_E(qaoa).
-        12. Use qaoa.get_Exp(depth=1) to get the expectation value of the Hamiltonian.
  
  - ALWAYS include the steps 1-6 if CASE 1 applies.
- - IF the USER asks for a visualization, include spteps 7-9.
- - IF the USER asks for a cost landscape, include steps 10-12.
+ - IF the USER asks for a visualization, include a step that asks for this. If the USER asks for something specific to the visualization, include a step that asks for this.
+ - IF the USER asks for a cost landscape, include a step that asks for this. 
 
 --- CASE 2: Generate a plan to explain the QAOA package.
-2. If the USER asks for an explanation about the QAOA package, generate a concise list of components. 
- - Title of the list is ALWAYS "Plan over which components of the QAOA package to explain".
+2. If the USER asks for an explanation about the QAOA package, generate a concise TWO-WORD list of components. It should be written as bullet points.
+ - Title of the list is either "Plan over which components of the QAOA package to explain" or "Plan for explanation of structures and relationships in the QAOA package".
  - Use this case if: "explain", "explanation", "components", "parts", or "structure" is in the description and "code" or "implementation" is not.
  - Include only the components that are relevant to the USER's request.
    
-   Template for some the components that can be relevant:
+   Some the components that can be relevant:
          - QAOA class
          - Problems classes
          - Mixers classes
          - Initial states classes
 
- - IF the USER ONLY asks for a specific class, method, or variable, then ONLY include that class, method, or variable in the list you generate.
+    If the USER asks for a "structure", "relation", "relationship", "overview" or "hierarchy" of the QAOA package then it can be relevant to include:
+         - structure
+         - relation
+         - overview
+
+ - IF the USER ONLY asks for a specific class, method, or variable, then ONLY include that class, method, or variable in the list you generate. It does not need to be in the context to be included.
 
 Strictly follow these rules:  
  - Output ONLY the numbered list of steps or the list of components.  
@@ -108,14 +112,40 @@ Strictly follow these rules:
 Remember: Be concise, focused, and precise.
 """,
         )
-        self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt, memory=self.memory)
+
+        # Initialize the other agents Explainer and CodeAssistant with context files
+        self.explainer = Explainer()
+        context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
+        self.codeassistant = CodeAssistant(context_files)
 
     def plan(self, description: str) -> str:
         """Generate a plan based on the user description and stored context."""
         result = self.chain.invoke(
             {"description": description, "context": self.context}
         )
-        return result["text"]
+        next_query = result["text"]
+        low_query = next_query.lower()
+        try:
+            # Check for specific cases in the response to determine whether to use an agent (or not), if agent then which agent to use
+            if (
+                "case 2" in low_query
+                or "Plan for explanation of structures and relationships in the QAOA package"
+                in low_query
+                or "Plan over which components of the QAOA package to explain"
+                in low_query
+            ):
+                response = self.explainer.explain(next_query)
+            elif "case 0" in low_query or "not a valid option" in low_query:
+                response = next_query
+            else:
+                response = self.codeassistant.generate_and_test_code(
+                    next_query
+                )  # TODO skjøte sammen next_query og description slik at codeassistant får med seg begge deler
+            return response
+        except Exception as e:
+            print("Error during planning:", e)
+            raise
 
     def __call__(self, description: str) -> str:
         """Call the planner with a description."""
@@ -131,7 +161,24 @@ Remember: Be concise, focused, and precise.
             self.context1 = "No context available."
 
 
-# Example usage:
 planner = Planner()
-result = planner("could you explain the overall structure of the QAOA package?")
-print(result)
+while True:
+    query = input("Ask a question (or 'exit' to quit): ")
+    if query.lower() in ["exit", "quit"]:
+        print("Goodbye!")
+        break
+
+    result = planner(query)
+    """
+    if "case 1" or "case 0" in result.lower():
+        print("\n\n\n\Plan:\n\n\n", result)
+        explainer = Explainer(result)
+        response = explainer.explain()
+    else:
+        # coder = CodeAssistant()
+        # response = coder.generate_and_test_code(result)
+        response = result
+    """
+    print("\nAnswer:")
+    print(result)
+    print("-" * 40)

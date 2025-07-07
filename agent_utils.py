@@ -25,6 +25,7 @@ from langchain.schema import Document
 
 #     return extracted_docs
 
+
 def extract_class_docstrings_from_documents(docs):
     extracted_docs = []
 
@@ -44,13 +45,13 @@ def extract_class_docstrings_from_documents(docs):
 
 
 # # ----- To load the files from the folder ------
-# def load_python_files(repo_path):
-#     """
-#     Load all Python files from the specified repository path.
-#     """
-#     loader_py = DirectoryLoader(repo_path, glob="**/*.py")
-#     docs_py = loader_py.load()
-#     return docs_py
+def load_python_files(repo_path):
+    """
+    Load all Python files from the specified repository path.
+    """
+    loader_py = DirectoryLoader(repo_path, glob="**/*.py")
+    docs_py = loader_py.load()
+    return docs_py
 
 
 # def load_text_files(repo_path):
@@ -73,11 +74,12 @@ def extract_class_docstrings_from_documents(docs):
 
 # -----
 
+
 def load_notebook(path: Path) -> str:
     """Load Jupyter notebook content."""
     with open(path, "r", encoding="utf-8") as f:
         notebook = json.load(f)
-    
+
     content = []
     for cell in notebook["cells"]:
         if cell["cell_type"] in ["markdown", "code"]:
@@ -86,17 +88,20 @@ def load_notebook(path: Path) -> str:
             # print(f"Loaded cell content:\n{cell_content}\n{'-'*50}")
     return "\n\n".join(content)
 
+
 def load_python_script(path: Path) -> str:
     """Load Python script content."""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
 
 def load_text_file(path: Path) -> str:
     """Load text or markdown file content."""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
-def load_context(paths:List[str]) -> None:
+
+def load_context(paths: List[str]) -> None:
     """Loads and processes documents from the specified paths."""
     context = []
     for path in paths:
@@ -114,6 +119,6 @@ def load_context(paths:List[str]) -> None:
             context.append(docstring_str)
         else:
             print(f"Unsupported file type - {path.suffix}. Skipping.")
-        
+
     print(f"Loaded {len(context)} files.")
     return context

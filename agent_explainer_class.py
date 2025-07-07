@@ -3,15 +3,16 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
 # ----- Helper imports -----
-from agent_utils import (
-    extract_docstrings_from_documents,
-    load_python_files,
-    creating_vectorstore,
-)
+from agent_utils import extract_class_docstrings_from_documents, load_python_files
+
+"""
+# ----- To test Explainer with Planner -----
+from agent_planner_class_sanne import result
+"""
 
 
 class Explainer:
-    def __init__(self, description, model="gpt-4", temperature=0):
+    def __init__(self, model="gpt-4", temperature=0):
         """
         Initialize the Explainer with the context for QAOA package components.
 
@@ -23,16 +24,21 @@ class Explainer:
         self.llm = ChatOpenAI(model=model, temperature=temperature)
         self.context = ""
         self.set_context()
-        self.description = description
         self.prompt = PromptTemplate(
             input_variables=["description", "context"],
             template="""
-        You are an expert on the QAOA package. You are a list over what you want to explain (they can be for example classes, methods, etc.) and you are going to explain how they work and what attributes, args, and returns they have to the USER.
+        You are an expert on the QAOA package. You get a list over what the USER wants you to explain (they can be for example classes, methods, etc.) and you are going to explain how they work and what attributes, args, and returns they have.
         
         The parts you want to explain are: {description}
         Your context is the documentation strings for the code: {context}
         
-        Make it helpful so that the USER understand the overall meaning of the parts of the package and also how it is used in a code. Be concise and structured. 
+        Make it helpful so that the USER understand the overall meaning of the parts of the package and also how it is used in a code. 
+        If you are explaining a method, include the class it belongs to. If you are explaining a class, include its methods and attributes there are any. If you are explaining a variable, include its type and purpose.
+        Be concise and structured. 
+        Do not include anything the USER has not asked for.
+
+        If you get a request that states an unvalid option, respond with:
+        "The [initial state/problem/mixer] '[name]' is not a valid option based on the documentation." and the list of valid options for the QAOA package.
         """,
         )
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
@@ -40,12 +46,16 @@ class Explainer:
     def set_context(self, max_chars=3000):
         """Set or update the context variable with documentation."""
         repo_path = "./qaoa"
-        docs_py = load_python_files(repo_path)
-        extracted_docs_py = extract_docstrings_from_documents(docs_py)
+        docs_py = load_python_files(
+            repo_path
+        )  # switched from load_python_files to load_python_script
+        extracted_docs_py = extract_class_docstrings_from_documents(docs_py)
+
         all_docstrings = [
             doc.page_content if hasattr(doc, "page_content") else str(doc)
             for doc in extracted_docs_py
         ]
+
         chunks = []
         current = ""
         for doc in all_docstrings:
@@ -58,22 +68,15 @@ class Explainer:
             chunks.append(current)
         self.context_chunks = chunks  # Store as a list of chunks
 
-    def explain(self, chunk_index=0):
+    def explain(self, description, chunk_index=0):
         """Generate an explanation using the specified context chunk."""
         context = self.context_chunks[chunk_index] if self.context_chunks else ""
-        result = self.chain.invoke(
-            {"description": self.description, "context": context}
-        )
+        result = self.chain.invoke({"description": description, "context": context})
         return result.get("text", result)
 
 
-explainer = Explainer(
-    """Plan over which components of the QAOA package to explain:
-
-1. QAOA class: This is the main class of the QAOA package. It is used to create an instance of the QAOA algorithm with a specific problem, mixer, and initial state.
-2. Problems classes: These classes define the problem that the QAOA algorithm will solve. The valid problems are ExactCover, GraphProblem, MaxKCutOneHot, MaxKCutBinaryPowerOfTwo, MaxKCutBinaryFullH, and PortifolioOptimization.
-3. Mixers classes: These classes define the mixer that the QAOA algorithm will use. The valid mixers are X, XY, Groover, MaxKCutGrover, and MaxKCutLX.
-4. Initial states classes: These classes define the initial state that the QAOA algorithm will start from. The valid initial states are Dicke, Dicke1_2, Plus, LessThanK, and StateVector."""
-)
+"""
+explainer = Explainer(result)
 explanation = explainer.explain()
-print(explanation)
+print("\n\nExplanation:\n\n", explanation)
+"""
