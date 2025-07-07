@@ -18,7 +18,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from langchain.tools import tool
 from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document
 
@@ -33,7 +33,12 @@ class CodeAssistant:
     def __init__(self, context_files: Optional[list[Union[str, Path]]]=None):
         self.llm = ChatOpenAI(model="gpt-4", temperature=0)
         self.tools = [self.execute_code]
-        # self.memory = ConversationBufferMemory(memory_key="chat_history", k=1, input_key="question", return_messages=True)
+        self.memory = ConversationSummaryMemory(
+            llm=self.llm,  # you must pass an LLM to generate summaries
+            memory_key="chat_history",
+            input_key="question",
+            return_messages=True
+        )
         self.vectorstore = None
         if context_files:
             self._process_documents(context_files)
@@ -106,6 +111,9 @@ You have three tasks based on the input:
 Context:
 {context}
 
+Chat History:
+{chat_history}
+
 Task:
 {question}
 
@@ -121,47 +129,28 @@ Guidelines:
 9. For parts of the task that are unspecified, provide brief reasoning for your choices.
 """
 )
-#         """You are a Python coding assistant. 
-#             You either suggest code based on the provided context OR receive an error message and interperet it .
-
-# Context:
-# {context}
-
-# 1. Generate Python code to solve: {question}
-# 2. The code should be complete and executable
-# 3. Include all necessary imports
-# 4. Format the code in markdown with ```python code fences
-# 5. Add BRIEF comments in the code exlaining key steps
-# 6. After the code, add a 1-2 sentence explaining the overall approach and any discrepancies with the original task
-
-# Execution Guidelines:
-# - The code will be automatically executed after generation
-# - If the execution returns "SUCCESS:" it means the code worked
-# - If the execution returns "ERROR:" it means the code failed
-# - Don't comment on it if the code doesn't return anything
-# - Maintain the ```python code fence format for the executable portion
-# - Don't phrase responses as if the code has been executed yet
-# """
-        # self.qa_chain = LLMChain(
-        #     llm=self.llm,
-        #     prompt = code_suggestion_prompt,
+        # self.qa_chain = RetrievalQA.from_chain_type(
+        #     llm = self.llm,
+        #     chain_type="stuff",
         #     retriever=self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4}) if self.vectorstore else None,
-        #     # memory=self.memory,
-        #     verbose=True,
-        #     # combine_docs_chain_kwargs={"prompt": code_suggestion_prompt},
-        # )
-        self.qa_chain = RetrievalQA.from_chain_type(
-            llm = self.llm,
-            chain_type="stuff",
+        #     chain_type_kwargs={
+        #         "prompt": code_suggestion_prompt,
+        #         # "document_variable_name": "context"
+        #     },
+        #     input_key="question",
+        #     output_key="answer",
+        #     return_source_documents=True
+        #     )
+        
+        # Using memory
+        self.qa_chain = ConversationalRetrievalChain.from_llm(
+            llm=self.llm,
             retriever=self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4}) if self.vectorstore else None,
-            chain_type_kwargs={
+            memory=self.memory,
+            combine_docs_chain_kwargs={
                 "prompt": code_suggestion_prompt,
-                # "document_variable_name": "context"
-            },
-            input_key="question",
-            output_key="answer",
-            return_source_documents=True
-            )
+            }
+        )
     
     def generate_and_test_code(self, query: str, max_iterations: int = 3) -> None:
         """Generate code, test it, and improve based on feedback."""
@@ -225,9 +214,26 @@ Guidelines:
 context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
 assistant = CodeAssistant(context_files)
 
-# query = "Create a random connected graph with 10 nodes. Include visualization."
-query = "Create a qaoa instance using onehot encoding."
+# # query = "Create a random connected graph with 10 nodes. Include visualization."
+# query = "Create a qaoa instance using onehot encoding."
 
-final_code = assistant.generate_and_test_code(query)
-print("\nFinal response:")
-print(final_code)
+# final_code = assistant.generate_and_test_code(query)
+# print("\nFinal response:")
+# print(final_code)
+
+# First query
+query1 = "Create a qaoa instance using onehot encoding."
+print("\n--- First Query ---")
+final_code1 = assistant.generate_and_test_code(query1)
+print("\nFinal response to first query:")
+print(final_code1)
+
+# Second query relies on memory of the first one
+query2 = "Can you explain why you used onehot encoding?"
+print("\n--- Second Query ---")
+final_response2 = assistant.qa_chain.invoke({"question": query2})
+print("\nFinal response to second query:")
+print(final_response2["answer"])
+
+print("\n--- Memory Summary ---")
+print(assistant.memory.buffer) 
