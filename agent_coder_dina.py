@@ -128,7 +128,7 @@ Guidelines:
 7. Phrase all responses as if it is the first response to the user.
 8. After generating code, briefly explain the approach and any potential limitations in the code or discrepancies between the code and the task.
 9. For parts of the task that are unspecified, provide brief reasoning for your choices.
-10. You may refer to previous tasks and responses in the conversation to maintain context and continuity.
+10. Refer to previous tasks and responses in the conversation to maintain context and continuity.
 """
 )       
         # Initialize chain that handles memory
@@ -198,7 +198,7 @@ Guidelines:
         return text.strip()
 
 # Example usage
-context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
+context_files = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]
 assistant = CodeAssistant(context_files)
 
 # query = "Create a random connected graph with 10 nodes. Include visualization."
@@ -208,22 +208,31 @@ assistant = CodeAssistant(context_files)
 # print("\nFinal response:")
 # print(final_code)
 
-# First query
-query1 = "Create a qaoa instance using onehot encoding."
-print("\nFirst query: ")
-print(f"\033[1m{query1}\033[0m")
-final_code1 = assistant.generate_and_test_code(query1)
-print("\nFinal response to first query:")
-print(f"\033[1m{final_code1}\033[0m")
+# # First query
+# query1 = "Create a qaoa instance using onehot encoding."
+# print("\nFirst query: ")
+# print(f"\033[1m{query1}\033[0m")
+# final_code1 = assistant.generate_and_test_code(query1)
+# print("\nFinal response to first query:")
+# print(f"\033[1m{final_code1}\033[0m")
 
-# Second query relies on memory of the first one
-query2 = "What did I just ask?"
-print("\nSecond query: ")
-print(f"\033[1m{query2}\033[0m")
-final_response2 = assistant.qa_chain.invoke({"question": query2})
-print("\nFinal response to second query:")
-print(f"\033[1m{final_response2["answer"]}\033[0m")
+# # Second query relies on memory of the first one
+# query2 = "Why did you choose the initial state and mixer like that?"
+# print("\nSecond query: ")
+# print(f"\033[1m{query2}\033[0m")
+# final_response2 = assistant.qa_chain.invoke({"question": query2})
+# print("\nFinal response to second query:")
+# print(f"\033[1m{final_response2["answer"]}\033[0m")
 
-# Print memory summary
-print("\nMemory summary:")
-print(assistant.memory.buffer) 
+# Third query
+query3 = """Create a qaoa circuit using a random 10-node connected graph for k = 3 using binary encoding and the full hamiltonian.
+Visualize both the graph and the circuit."""
+print("\nThird query: ")
+print(f"\033[1m{query3}\033[0m")
+final_code3 = assistant.generate_and_test_code(query3)
+print("\nFinal response to third query:")
+print(f"\033[1m{final_code3}\033[0m")
+
+# # Print memory summary
+# print("\033[95m\nMemory summary:\033[0m")
+# print(f"\033[95m{assistant.memory.buffer}\033[0m") 

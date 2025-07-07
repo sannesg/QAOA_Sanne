@@ -26,23 +26,38 @@ from langchain.schema import Document
 #     return extracted_docs
 
 
-def extract_class_docstrings_from_documents(docs):
+# def extract_class_docstrings_from_documents(docs:List[Document]) -> str:
+#     extracted_docs = []
+
+#     for doc in docs:
+#         try:
+#             tree = ast.parse(doc.page_content)
+#             for node in ast.walk(tree):
+#                 if isinstance(node, ast.ClassDef):
+#                     docstring = ast.get_docstring(node)
+#                     if docstring:
+#                         extracted_docs.append(
+#                             page_content=docstring.strip(), metadata=doc.metadata
+#                         )
+#         except SyntaxError:  # Skip documents that can't be parsed
+#             continue
+#     return extracted_docs
+
+def extract_class_docstrings_from_string(code: str) -> str:
+    """Extract class-level docstrings from a Python source string."""
     extracted_docs = []
 
-    for doc in docs:
-        try:
-            tree = ast.parse(doc.page_content)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ClassDef):
-                    docstring = ast.get_docstring(node)
-                    if docstring:
-                        extracted_docs.append(
-                            page_content=docstring.strip(), metadata=doc.metadata
-                        )
-        except SyntaxError:  # Skip documents that can't be parsed
-            continue
-    return extracted_docs
+    try:
+        tree = ast.parse(code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                docstring = ast.get_docstring(node)
+                if docstring:
+                    extracted_docs.append(docstring.strip())
+    except SyntaxError:
+        pass  # Skip files that fail to parse
 
+    return "\n\n".join(extracted_docs)
 
 # # ----- To load the files from the folder ------
 def load_python_files(repo_path):
@@ -115,10 +130,11 @@ def load_context(paths: List[str]) -> None:
             context.append(load_text_file(path))
         elif path.suffix == ".py":
             py_str = load_python_script(path)
-            docstring_str = extract_class_docstrings_from_documents(py_str)
+            docstring_str = extract_class_docstrings_from_string(py_str)
             context.append(docstring_str)
         else:
             print(f"Unsupported file type - {path.suffix}. Skipping.")
 
     print(f"\nLoaded {len(context)} files.")
     return context
+
