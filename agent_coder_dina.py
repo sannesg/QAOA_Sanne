@@ -122,14 +122,16 @@ AI:
 Guidelines:
 1. Generate Python code to solve the task provided by the Human.
 2. The code should be complete and executable
-3. The code should include all necessary imports and mainly use the QAOA package
+3. The code should include all necessary imports and mainly use the QAOA package. Don't include any imports that are not used.
 4. The code should be formatted in markdown with ```python code fences
 5. The code should include BRIEF comments in the code explaining key steps.
 6. If analyzing an error, provide concise suggestions for improvement without generating code.
-7. Phrase all responses as if it is the first response to the user.
-8. After generating code, briefly explain the approach and any potential limitations in the code or discrepancies between the code and the task.
-9. For parts of the task that are unspecified, provide brief reasoning for your choices.
-10. Refer to previous tasks and responses in the conversation to maintain context and continuity.
+7. If analyzing an error and the error is 'NoneType', the function probably updates an internal variable, rather than returning a value.
+In this case, try to find the variable that is updated and suggest using this instead.
+8. Phrase all responses as if it is the first response to its corresponding query. i.e. don't mention executing code or changes made after executing code. 
+9. After generating code, briefly explain the approach and any potential limitations in the code or discrepancies between the code and the task.
+10. For parts of the task that are unspecified, provide brief reasoning for your choices.
+11. Refer to previous tasks and responses in the conversation to maintain context and continuity.
 """
 )       
         # Initialize chain that handles memory
@@ -176,7 +178,7 @@ Guidelines:
                 matplotlib.use("TkAgg")  # Reset to default backend
                 print(f"\033[96m{execution_result}\033[0m")
                 if "ERROR" in execution_result:
-                    print(f"\033[96m\nGenerating error analysis\033[0m")
+                    print(f"\033[96m\nGenerating error analysis...\033[0m")
                     result = self.qa_chain.invoke({
                         "question": f"""Analyze the following error: {execution_result}. 
                         Provide suggestions for improving the code without generating new code."""})
@@ -209,21 +211,21 @@ assistant = CodeAssistant(context_files)
 # print("\nFinal response:")
 # print(final_code)
 
-# # First query
-# query1 = "Create a qaoa instance using onehot encoding."
-# print("\nFirst query: ")
-# print(f"\033[1m{query1}\033[0m")
-# final_code1 = assistant.generate_and_test_code(query1)
-# print("\nFinal response to first query:")
-# print(f"\033[1m{final_code1}\033[0m")
+# First query
+query1 = "Create a qaoa instance using onehot encoding."
+print("\nFirst query: ")
+print(f"\033[1m{query1}\033[0m")
+final_code1 = assistant.generate_and_test_code(query1)
+print("\nFinal response to first query:")
+print(f"\033[1m{final_code1}\033[0m")
 
-# # Second query relies on memory of the first one
-# query2 = "Why did you choose the initial state and mixer like that?"
-# print("\nSecond query: ")
-# print(f"\033[1m{query2}\033[0m")
-# final_response2 = assistant.qa_chain.invoke({"question": query2})
-# print("\nFinal response to second query:")
-# print(f"\033[1m{final_response2["answer"]}\033[0m")
+# Second query relies on memory of the first one
+query2 = "Why did you choose the initial state and mixer like that?"
+print("\nSecond query: ")
+print(f"\033[1m{query2}\033[0m")
+final_response2 = assistant.qa_chain.invoke({"question": query2})
+print("\nFinal response to second query:")
+print(f"\033[1m{final_response2["answer"]}\033[0m")
 
 # Third query
 query3 = """Create a qaoa circuit using a random 10-node connected graph for k = 3 using binary encoding and the full hamiltonian.

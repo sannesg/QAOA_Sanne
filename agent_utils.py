@@ -113,7 +113,7 @@ def extract_class_docstrings_from_string(code: str) -> str:
 
     return "\n\n".join(extracted_docs)
 
-def load_context(paths: List[str]) -> None:
+def load_context(paths: List[str]) -> List[str]:
     """Loads and processes documents from the specified paths."""
     context = []
     for path in paths:
