@@ -42,7 +42,8 @@ class CodeAssistant:
         )
         self.vectorstore = None
         if context_files:
-            self.vectorstore = agent_utils.process_documents(context_files)
+            self.context = agent_utils.load_context(context_files)
+            self.vectorstore = agent_utils.process_documents(self.context)
             
         self._initialize_agent()
         

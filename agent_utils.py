@@ -135,13 +135,12 @@ def load_context(paths: List[str]) -> None:
     print(f"\nLoaded {len(context)} files.")
     return context
 
-def process_documents(paths: List[str]) -> FAISS | None:
+def process_documents(context_strs: List[str]) -> FAISS | None:
     """Process and store documents in vectorstore."""
-    docs_str = load_context(paths)
     
-    print(f"Processing {len(docs_str)} raw documents.")
+    print(f"Processing {len(context_strs)} raw documents.")
     try:
-        docs = [Document(page_content=doc.strip()) for doc in docs_str]
+        docs = [Document(page_content=context_str.strip()) for context_str in context_strs]
     
         splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
         split_docs = splitter.split_documents(docs)
