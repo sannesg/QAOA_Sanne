@@ -42,7 +42,7 @@ class CodeAssistant:
         )
         self.vectorstore = None
         if context_files:
-            self._process_documents(context_files)
+            self.vectorstore = agent_utils.process_documents(context_files)
             
         self._initialize_agent()
         
@@ -68,29 +68,29 @@ class CodeAssistant:
             # Return just the error type and message, not full traceback
             return f"ERROR: {type(e).__name__}: {str(e)}"
     
-    def _process_documents(self, paths: List[str]) -> None:
-        """Process and store documents in vectorstore."""
-        docs_str = agent_utils.load_context(paths)
+    # def _process_documents(self, paths: List[str]) -> None:
+    #     """Process and store documents in vectorstore."""
+    #     docs_str = agent_utils.load_context(paths)
         
-        print(f"Processing {len(docs_str)} raw documents.")
-        try:
-            docs = [Document(page_content=doc.strip()) for doc in docs_str]
+    #     print(f"Processing {len(docs_str)} raw documents.")
+    #     try:
+    #         docs = [Document(page_content=doc.strip()) for doc in docs_str]
         
-            splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
-            split_docs = splitter.split_documents(docs)
-            print(f"Generated {len(split_docs)} split documents.")
+    #         splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+    #         split_docs = splitter.split_documents(docs)
+    #         print(f"Generated {len(split_docs)} split documents.")
         
-            if not split_docs:
-                print("No documents to process after splitting. Skipping vectorstore creation.")
-                return
+    #         if not split_docs:
+    #             print("No documents to process after splitting. Skipping vectorstore creation.")
+    #             return
         
-            embedding = OpenAIEmbeddings()
+    #         embedding = OpenAIEmbeddings()
 
-            self.vectorstore = FAISS.from_documents(split_docs, embedding)
-            print(f"Created vectorstore with {len(split_docs)} documents.")
-        except Exception as e:
-            print(f"Error processing documents: {str(e)}")
-            self.vectorstore = None
+    #         self.vectorstore = FAISS.from_documents(split_docs, embedding)
+    #         print(f"Created vectorstore with {len(split_docs)} documents.")
+    #     except Exception as e:
+    #         print(f"Error processing documents: {str(e)}")
+    #         self.vectorstore = None
             
     def _initialize_agent(self, context_files: Optional[list[Union[str, Path]]]=None) -> None:
         """Initialize and return the agent executor."""

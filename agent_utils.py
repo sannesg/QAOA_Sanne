@@ -8,6 +8,7 @@ from langchain_core.documents import Document
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 import ast
 from langchain.schema import Document
@@ -43,22 +44,6 @@ from langchain.schema import Document
 #             continue
 #     return extracted_docs
 
-def extract_class_docstrings_from_string(code: str) -> str:
-    """Extract class-level docstrings from a Python source string."""
-    extracted_docs = []
-
-    try:
-        tree = ast.parse(code)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                docstring = ast.get_docstring(node)
-                if docstring:
-                    extracted_docs.append(docstring.strip())
-    except SyntaxError:
-        pass  # Skip files that fail to parse
-
-    return "\n\n".join(extracted_docs)
-
 # # ----- To load the files from the folder ------
 def load_python_files(repo_path):
     """
@@ -89,7 +74,6 @@ def load_python_files(repo_path):
 
 # -----
 
-
 def load_notebook(path: Path) -> str:
     """Load Jupyter notebook content."""
     with open(path, "r", encoding="utf-8") as f:
@@ -103,18 +87,31 @@ def load_notebook(path: Path) -> str:
             # print(f"Loaded cell content:\n{cell_content}\n{'-'*50}")
     return "\n\n".join(content)
 
-
 def load_python_script(path: Path) -> str:
     """Load Python script content."""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
-
 
 def load_text_file(path: Path) -> str:
     """Load text or markdown file content."""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
+def extract_class_docstrings_from_string(code: str) -> str:
+    """Extract class-level docstrings from a Python source string."""
+    extracted_docs = []
+
+    try:
+        tree = ast.parse(code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                docstring = ast.get_docstring(node)
+                if docstring:
+                    extracted_docs.append(docstring.strip())
+    except SyntaxError:
+        pass  # Skip files that fail to parse
+
+    return "\n\n".join(extracted_docs)
 
 def load_context(paths: List[str]) -> None:
     """Loads and processes documents from the specified paths."""
@@ -138,3 +135,27 @@ def load_context(paths: List[str]) -> None:
     print(f"\nLoaded {len(context)} files.")
     return context
 
+def process_documents(paths: List[str]) -> FAISS | None:
+    """Process and store documents in vectorstore."""
+    docs_str = load_context(paths)
+    
+    print(f"Processing {len(docs_str)} raw documents.")
+    try:
+        docs = [Document(page_content=doc.strip()) for doc in docs_str]
+    
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+        split_docs = splitter.split_documents(docs)
+        print(f"Generated {len(split_docs)} split documents.")
+    
+        if not split_docs:
+            print("No documents to process after splitting. Skipping vectorstore creation.")
+            return
+    
+        embedding = OpenAIEmbeddings()
+
+        vectorstore = FAISS.from_documents(split_docs, embedding)
+        print(f"Created vectorstore with {len(split_docs)} documents.")
+    except Exception as e:
+        print(f"Error processing documents: {str(e)}")
+        vectorstore = None
+    return vectorstore
