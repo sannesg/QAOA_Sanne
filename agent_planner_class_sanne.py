@@ -1,7 +1,7 @@
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationSummaryBufferMemory
 
 
 # ----- Class imports -----
@@ -33,8 +33,12 @@ class Planner:
         """
         self.llm = ChatOpenAI(model=model, temperature=temperature)
         # TODO add vectorstore and embedding
-        self.memory = ConversationBufferMemory(  # TODO change into CoversationSummaryMemory to only keep some of the chat history
-            memory_key="chat_history", input_key="description"
+        self.memory = ConversationSummaryBufferMemory(  # TODO change into CoversationSummaryMemory to only keep some of the chat history
+            llm=self.llm,
+            memory_key="chat_history",
+            input_key="description",
+            return_messages=True,
+            max_token_limit=1000,
         )
         self.context = ""
         self.set_context()
