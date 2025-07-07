@@ -6,6 +6,7 @@ from langchain.agents import initialize_agent, AgentType
 
 # ----- Class imports -----
 from agent_explainer_class import Explainer
+from agent_coder_dina import CodeAssistant
 
 # from agent_coder_dina import CodeAssistant
 
@@ -142,20 +143,17 @@ Remember: Be concise, focused, and precise.""",
         except FileNotFoundError:
             self.context = "No context available."
 
-    @staticmethod
-    def choose_agent(description: str) -> str:
+    def choose_agent(self, description: str):
         """Choose which agent to use based on the description."""
 
-        if (
-            "Plan over which components of the QAOA package to explain"
-            or "Plan for explaination of structures and relationships in the QAOA package"
-            in description
-        ):
-            return "Explainer"  # TODO call Explainer class
-        elif "code" in description or "implementation" in description:
-            return "CodeAssistant"  # TODO call CodeAssistant class
+        if "explain" in description:
+            explainer = Explainer(description)
+            return explainer.explain()
+        elif "code" in description:
+            code_assistant = CodeAssistant(description)
+            return code_assistant._initialize_agent()
         else:
-            return "UnknownAgent"
+            return "Unknown agent"
 
 
 while True:
@@ -166,6 +164,7 @@ while True:
 
     planner = Planner()
     result = planner(query)
+    final_response = result.choose_agent(query, result)
     """
     if "case 1" or "case 0" in result.lower():
         print("\n\n\n\Plan:\n\n\n", result)
