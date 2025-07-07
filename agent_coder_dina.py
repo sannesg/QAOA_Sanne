@@ -159,16 +159,16 @@ Guidelines:
         # last_error = None
         
         for iteration in range(max_iterations):
-            print(f"\n===== Iteration {iteration + 1} =====")
+            print(f"\n--- Iteration {iteration + 1} ---")
             
             # Generate or improve code
             if current_code is None:
-                print("Generating initial response...")
+                print("\nGenerating initial response...")
                 result = self.qa_chain.invoke({
                     # "context": self.context, 
                     "question": query})
             else:
-                print("Improving response based on previous error...")
+                print("\nImproving response based on previous error...")
                 result = self.qa_chain.invoke({
                     # "context": self.context,
                     "question": f"Improve this code based on the following feedback: {error_analysis}\nOriginal task: {query}\nCode:\n{self._extract_code_block(current_code)}"
@@ -177,22 +177,22 @@ Guidelines:
             current_code = result["answer"]
             
             print("\nResponse:")
-            print(current_code)
+            print(f"\n{current_code}")
             
             if "```" in current_code:
-                matplotlib.use("Agg")  # Use a non-interactive backend for matplotlib
+                matplotlib.use("Agg")  # Use a non-interactive backend for matplotlib (no verbose output in console)
+                print("\033[96m\nExecuting code...\033[0m")
                 execution_result = self.execute_code(self._extract_code_block(current_code))
                 matplotlib.use("TkAgg")  # Reset to default backend
-                print("\nExecution Result:")
-                print(execution_result)
+                print(f"\033[96m{execution_result}\033[0m")
                 if "ERROR" in execution_result:
+                    print(f"\033[96m\nGenerating error analysis\033[0m")
                     result = self.qa_chain.invoke({
                         # "context": self.context, 
                         "question": f"""Analyze the following error: {execution_result}. 
                         Provide suggestions for imporving the code without generating new code."""})
                     error_analysis = result["answer"]
-                    print("\nError Analysis:")
-                    print(error_analysis)
+                    print(f"\033[96mError analysis: {error_analysis}\033[0m")
                 else:
                     return current_code
                 
@@ -223,17 +223,18 @@ assistant = CodeAssistant(context_files)
 
 # First query
 query1 = "Create a qaoa instance using onehot encoding."
-print("\n--- First Query ---")
+print("\nFirst query: ")
+print(f"\033[1m{query1}\033[0m")
 final_code1 = assistant.generate_and_test_code(query1)
 print("\nFinal response to first query:")
-print(final_code1)
+print(f"\033[1m\n{final_code1}\033[0m")
 
-# Second query relies on memory of the first one
-query2 = "Can you explain why you used onehot encoding?"
-print("\n--- Second Query ---")
-final_response2 = assistant.qa_chain.invoke({"question": query2})
-print("\nFinal response to second query:")
-print(final_response2["answer"])
+# # Second query relies on memory of the first one
+# query2 = "Can you explain why you used onehot encoding?"
+# print("\n--- Second Query ---")
+# final_response2 = assistant.qa_chain.invoke({"question": query2})
+# print("\nFinal response to second query:")
+# print(final_response2["answer"])
 
-print("\n--- Memory Summary ---")
-print(assistant.memory.buffer) 
+# print("\n--- Memory Summary ---")
+# print(assistant.memory.buffer) 
