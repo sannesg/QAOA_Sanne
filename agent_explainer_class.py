@@ -1,6 +1,7 @@
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+from langchain.memory import ConversationSummaryBufferMemory
 
 # ----- Helper imports -----
 from agent_utils import extract_class_docstrings_from_documents, load_python_files
@@ -17,6 +18,13 @@ class Explainer:
             temperature (float): The temperature for the language model.
         """
         self.llm = ChatOpenAI(model=model, temperature=temperature)
+        self.memory = ConversationSummaryBufferMemory(
+            llm=self.llm,
+            memory_key="chat_history",
+            input_key="description",
+            return_messages=True,
+            max_token_limit=1000,
+        )
         self.context = ""
         self.set_context()
         self.prompt = PromptTemplate(
