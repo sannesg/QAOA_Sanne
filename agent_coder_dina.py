@@ -1,11 +1,19 @@
 # Load API key
 from dotenv import load_dotenv
+
 load_dotenv()
+
+import agent_utils
 
 import json
 import re
 from pathlib import Path
 from typing import Dict, Any, List, Union, Optional
+import io
+import sys
+from contextlib import redirect_stdout, redirect_stderr
+import traceback
+import matplotlib
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
@@ -16,270 +24,236 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document
 
 from langchain.agents import initialize_agent, AgentType, AgentExecutor
-from langchain.chains import ConversationalRetrievalChain, RetrievalQA
+from langchain.chains import ConversationalRetrievalChain, RetrievalQA, LLMChain
 
 from langchain_community.vectorstores import FAISS
+
 # from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_community.document_loaders import DirectoryLoader
+# from langchain_community.document_loaders import DirectoryLoader
+
 
 class CodeAssistant:
-    def __init__(self, context_files: Optional[list[Union[str, Path]]]=None):
+    def __init__(self, context_files: Optional[list[Union[str, Path]]] = None):
         self.llm = ChatOpenAI(model="gpt-4", temperature=0)
         self.tools = [self.execute_code]
-        self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+        # self.memory = ConversationBufferMemory(memory_key="chat_history", k=1, input_key="question", return_messages=True)
         self.vectorstore = None
         if context_files:
-            self._load_context(context_files)
-        self.agent = self._initialize_agent()
-        
-    @tool
+            self._process_documents(context_files)
+
+        self._initialize_agent()
+
+    # @tool
     def execute_code(self, code: str) -> str:
-        """Executes the provided Python code and returns the result or error."""
+        """Executes the provided Python code and returns only error messages if any occur."""
         try:
             # Remove Markdown code fences if present
             code = re.sub(r"^```(?:python)?", "", code.strip(), flags=re.IGNORECASE)
             code = re.sub(r"```$", "", code.strip())
 
+            # Redirect stdout to suppress circuit diagrams
+
             exec_globals = {}
-            exec(code.strip(), exec_globals)
-            return str(exec_globals.get('result', 'Code executed successfully, but no result variable found.'))
+            f = io.StringIO()
+
+            with redirect_stdout(f), redirect_stderr(f):
+                exec(code.strip(), exec_globals)
+
+            # Only return success message if no errors
+            return "SUCCESS: Code executed without errors"
+
         except Exception as e:
-            import traceback
-            return f"Error executing code:\n{traceback.format_exc()}"
+            # Return just the error type and message, not full traceback
+            return f"ERROR: {type(e).__name__}: {str(e)}"
 
-    def _load_context(self, paths:List[str]) -> None:
-        """Loads and processes documents from the specified paths."""
-        documents = []
-        for path in paths:
-            path = Path(path)
-            if not path.exists():
-                print(f"File not found - {path}. Skipping.")
-                continue
-            if path.suffix == ".ipynb":
-                documents.extend(self._load_notebook(path))
-            elif path.suffix == ".py":
-                documents.extend(self._load_python_script(path))
-            elif path.suffix in [".txt", ".md"]:
-                documents.extend(self._load_text_file(path))
-            else:
-                print(f"Unsupported file type - {path.suffix}. Skipping.")
-            
-        print(f"Loaded {len(documents)} documents.")
-
-        if documents:
-            docstring_docs = self._extract_docstrings_from_documents(documents)
-            self._process_docments(docstring_docs)
-            
-    def _load_notebook(self, path: Path) -> List[Document]:
-        """Load Jupyter notebook content."""
-        with open(path, "r", encoding="utf-8") as f:
-            notebook = json.load(f)
-        
-        content = []
-        for cell in notebook["cells"]:
-            if cell["cell_type"] in ["markdown", "code"]:
-                cell_content = "\n".join(cell["source"])
-                content.append(cell_content)
-                print(f"Loaded cell content:\n{cell_content}\n{'-'*50}")
-        
-        return [Document(page_content="\n\n".join(content))]
-    
-    def _load_python_script(self, path: Path) -> List[Document]:
-        """Load Python script content."""
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-        
-        return [Document(page_content=content)]
-    
-    def _load_text_file(self, path: Path) -> List[Document]:
-        """Load text or markdown file content."""
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-        
-        return [Document(page_content=content)]
-
-    def _extract_docstrings_from_documents(self, docs: List[Document]) -> List[Document]:
-        docstring_pattern = r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')'
-        extracted_docs = []
-
-        for doc in docs:
-            matches = re.findall(docstring_pattern, doc.page_content)
-            for match in matches:
-                extracted_docs.append(
-                    Document(page_content=match.strip(), metadata=doc.metadata)
-                )
-
-        return extracted_docs
-    
-    def _process_docments(self, docs: List[Document]) -> None:
+    def _process_documents(self, paths: List[str]) -> None:
         """Process and store documents in vectorstore."""
-        print(f"Processing {len(docs)} raw documents")
-        
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
-        split_docs = splitter.split_documents(docs)
-        print(f"Number of split documents: {len(split_docs)}")
-        
-        if not split_docs:
-            print("No documents to process after splitting. Skipping vectorstore creation.")
-            return
+        docs_str = agent_utils.load_context(paths)
 
-        print(f"Number of split documents: {len(split_docs)}")
-        
-        embedding = OpenAIEmbeddings()
-        
-        if self.vectorstore is None:
+        print(f"Processing {len(docs_str)} raw documents")
+        try:
+            docs = [Document(page_content=doc.strip()) for doc in docs_str]
+
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1500, chunk_overlap=200
+            )
+            split_docs = splitter.split_documents(docs)
+            print(f"Number of split documents: {len(split_docs)}.")
+
+            if not split_docs:
+                print(
+                    "No documents to process after splitting. Skipping vectorstore creation."
+                )
+                return
+
+            embedding = OpenAIEmbeddings()
+
             self.vectorstore = FAISS.from_documents(split_docs, embedding)
-        else:
-            self.vectorstore.add_documents(split_docs)
-            
-    def _initialize_agent(self) -> AgentExecutor:
+            print(f"Created vectorstore with {len(split_docs)} documents.")
+        except Exception as e:
+            print(f"Error processing documents: {str(e)}")
+            self.vectorstore = None
+
+    def _initialize_agent(
+        self, context_files: Optional[list[Union[str, Path]]] = None
+    ) -> None:
         """Initialize and return the agent executor."""
         # Define prompts
+        if context_files:
+            self.context = agent_utils.load_context(context_files)
+
         code_suggestion_prompt = PromptTemplate(
             input_variables=["context", "question"],
-            template="""You are a Python coding assistant. You suggest code based on the provided context.
+            template="""You are a Python coding assistant. 
+            
+You have three tasks based on the input:
 
-Available Context:
+1. If asked a query with no error information, generate Python code to solve the task.
+2. If provided with an error message, analyze the error and suggest improvements to the code without generating new code.
+3. If asked to improve code based on suggestions, generate improved Python code considering the provided feedback.
+
+Context:
 {context}
 
 Task:
-1. Generate Python code to solve: {question}
+{question}
+
+Guidelines:
+1. Generate Python code to solve the task
 2. The code should be complete and executable
-3. Include a 'result' variable with the main output
-4. Format the code in markdown with ```python code fences
-5. If context is available, use relevant examples from it
-"""
+3. The code should include all necessary imports and mainly use the QAOA package
+4. The code should be formatted in markdown with ```python code fences
+5. The code should include BRIEF comments in the code explaining key steps.
+6. If analyzing an error, provide concise suggestions for improvement without generating code.
+7. Phrase all responses as if it is the first response to the user.
+8. After generating code, briefly explain the approach and any potential limitations in the code or discrepancies between the code and the task.
+9. For parts of the task that are unspecified, provide brief reasoning for your choices.
+""",
         )
-        if not self.vectorstore:
-            print("Vectorstore is not initialized. Retrieval-based QA will not work.")
-            return None
+        #         """You are a Python coding assistant.
+        #             You either suggest code based on the provided context OR receive an error message and interperet it .
 
-        # Create retrieval chain for code suggestion
-        self.qa_chain = ConversationalRetrievalChain.from_llm(
+        # Context:
+        # {context}
+
+        # 1. Generate Python code to solve: {question}
+        # 2. The code should be complete and executable
+        # 3. Include all necessary imports
+        # 4. Format the code in markdown with ```python code fences
+        # 5. Add BRIEF comments in the code exlaining key steps
+        # 6. After the code, add a 1-2 sentence explaining the overall approach and any discrepancies with the original task
+
+        # Execution Guidelines:
+        # - The code will be automatically executed after generation
+        # - If the execution returns "SUCCESS:" it means the code worked
+        # - If the execution returns "ERROR:" it means the code failed
+        # - Don't comment on it if the code doesn't return anything
+        # - Maintain the ```python code fence format for the executable portion
+        # - Don't phrase responses as if the code has been executed yet
+        # """
+        # self.qa_chain = LLMChain(
+        #     llm=self.llm,
+        #     prompt = code_suggestion_prompt,
+        #     retriever=self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4}) if self.vectorstore else None,
+        #     # memory=self.memory,
+        #     verbose=True,
+        #     # combine_docs_chain_kwargs={"prompt": code_suggestion_prompt},
+        # )
+        self.qa_chain = RetrievalQA.from_chain_type(
             llm=self.llm,
-            retriever=self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4}) if self.vectorstore else None,
-            memory=self.memory,
-            combine_docs_chain_kwargs={"prompt": code_suggestion_prompt},
+            chain_type="stuff",
+            retriever=(
+                self.vectorstore.as_retriever(
+                    search_type="similarity", search_kwargs={"k": 4}
+                )
+                if self.vectorstore
+                else None
+            ),
+            chain_type_kwargs={
+                "prompt": code_suggestion_prompt,
+                # "document_variable_name": "context"
+            },
+            input_key="question",
+            output_key="answer",
+            return_source_documents=True,
         )
 
-        # Create agent for code testing/execution
-        return initialize_agent(
-            tools=self.tools,
-            llm=self.llm,
-            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-            verbose=True,
-            handle_parsing_errors=True,
-            max_iterations=5
-        )
+    def generate_and_test_code(self, query: str, max_iterations: int = 3) -> None:
+        """Generate code, test it, and improve based on feedback."""
+        current_code = None
+        error_analysis = None
+        # last_error = None
 
+        for iteration in range(max_iterations):
+            print(f"\n===== Iteration {iteration + 1} =====")
+
+            # Generate or improve code
+            if current_code is None:
+                print("Generating initial response...")
+                result = self.qa_chain.invoke(
+                    {
+                        # "context": self.context,
+                        "question": query
+                    }
+                )
+            else:
+                print("Improving response based on previous error...")
+                result = self.qa_chain.invoke(
+                    {
+                        # "context": self.context,
+                        "question": f"Improve this code based on the following feedback: {error_analysis}\nOriginal task: {query}\nCode:\n{self._extract_code_block(current_code)}"
+                    }
+                )
+
+            current_code = result["answer"]
+
+            print("\nResponse:")
+            print(current_code)
+
+            if "```" in current_code:
+                matplotlib.use("Agg")  # Use a non-interactive backend for matplotlib
+                execution_result = self.execute_code(
+                    self._extract_code_block(current_code)
+                )
+                matplotlib.use("TkAgg")  # Reset to default backend
+                print("\nExecution Result:")
+                print(execution_result)
+                if "ERROR" in execution_result:
+                    result = self.qa_chain.invoke(
+                        {
+                            # "context": self.context,
+                            "question": f"""Analyze the following error: {execution_result}. 
+                        Provide suggestions for imporving the code without generating new code."""
+                        }
+                    )
+                    error_analysis = result["answer"]
+                    print("\nError Analysis:")
+                    print(error_analysis)
+                else:
+                    return current_code
+
+            else:
+                return current_code
+
+        print(f"\nReached maximum iterations ({max_iterations})")
+        # return self._extract_code_block(current_code)
+        return current_code
+
+    def _extract_code_block(self, text: str) -> str:
+        """Extract code from markdown block."""
+        match = re.search(r"```python(.*?)```", text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return text.strip()
+
+
+# Example usage
 context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
-
 assistant = CodeAssistant(context_files)
 
-query = "Creaye a QAOA instance using the MaxKCutBinaryPowerOfTwo problem, X mixer and Plus initial state for k = 2, making a random graph."
-result = assistant.qa_chain({"question": query})
-print("\nAnswer:")
-print(result["answer"])
+# query = "Create a random connected graph with 10 nodes. Include visualization."
+query = "Create a qaoa instance using onehot encoding."
 
-# retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4})
-
-# rag_chain = RetrievalQA.from_chain_type(
-#     llm=llm, retriever=retriever, chain_type="stuff"
-# )
-
-# # Instantiate the LLM
-# llm = ChatOpenAI(model="gpt-4", temperature=0)
-
-# # List of tools for the agent
-# tools = [execute_code]
-
-# # Define prompt
-# code_prompt = PromptTemplate(
-#     input_variables=["context", "question"],
-#     template="""You are a Python coding assistant.
-
-# You are provided with the following context:
-# {context}
-
-# Your task is to answer the following question based on the context:
-# {question}
-# """
-# #     template="""You are a Python code testing assistant.
-
-# # You're given Python code. Your task is to **run** the code and report **any errors** that occur during execution. Use the `execute_code` tool to help with this.
-
-# # Code:
-# # {input}
-# # """
-# )
-
-# notebook_path = "./examples/MaxCut/KCutExamples.ipynb"
-
-# with open(notebook_path, "r", encoding="utf-8") as f:
-#     notebook = json.load(f)
-
-# context = []
-# for cell in notebook["cells"]:
-#     if cell["cell_type"] == "markdown":
-#         context.append("\n".join(cell["source"]))
-#     elif cell["cell_type"] == "code":
-#         context.append("\n".join(cell["source"]))
-
-# context_string = "\n\n".join(context)
-
-# # Convert context_string into a list of Document objects
-# documents = [Document(page_content=context_string)]
-
-# splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
-# context_split = splitter.split_documents(documents)
-
-# # Turn the split documents into vectors
-# embedding = OpenAIEmbeddings()
-# vectorstore = FAISS.from_documents(context_split, embedding)
-
-# memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-
-# qa_chain = ConversationalRetrievalChain.from_llm(
-#     llm=llm,
-#     retriever=vectorstore.as_retriever(),
-#     memory=memory,
-#     combine_docs_chain_kwargs={"prompt": code_prompt},
-# )
-
-# query = "Create a QAOA instance using the MaxKCutBinaryPowerOfTwo problem, X mixer and Plus initial state for k = 2, making a random graph."
-
-# result = qa_chain({"question": query})
-# print("\nAnswer:")
-# print(result["answer"])
-
-# Sample code to test
-# code_to_test = """
-# import networkx as nx
-# import numpy as np
-# from qaoa.problems import MaxKCutBinaryPowerOfTwo
-
-# G = nx.Graph()
-# G.add_nodes_from(np.arange(0, 5, 1))  # Create a graph with 5 nodes
-# G.add_weighted_edges_from(
-#     [(0, 1, 1.0), (0, 2, 1.0), (1, 2, 1.0), (3, 2, 1.0), (3, 4, 1.0), (4, 2, 1.0)]
-# )
-
-# problem = MaxKCutBinaryPowerOfTwo(G=G, k_cuts=2)
-# result = problem  # Store result to be returned
-# """
-
-# # Initialize the agent
-# code_agent = initialize_agent(
-#     tools=tools,
-#     llm=llm,
-#     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-#     verbose=True
-# )
-
-# # Run the agent with the code to test
-# answer = code_agent.run(f"Please run the following code and report any errors:\n\n{code_to_test}")
-
-# # Output the result
-# print(answer)
-
-
+final_code = assistant.generate_and_test_code(query)
+print("\nFinal response:")
+print(final_code)
