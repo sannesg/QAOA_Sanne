@@ -33,7 +33,7 @@ class Planner:
         """
         self.llm = ChatOpenAI(model=model, temperature=temperature)
         # TODO add vectorstore and embedding
-        self.memory = ConversationSummaryBufferMemory(  # TODO change into CoversationSummaryMemory to only keep some of the chat history
+        self.memory = ConversationSummaryBufferMemory(
             llm=self.llm,
             memory_key="chat_history",
             input_key="description",
@@ -143,7 +143,7 @@ Remember: Be concise, focused, and precise.
                 response = self.explainer.explain(next_query)
             elif "case 0" in low_plan or "not a valid option" in low_plan:
                 print("not using an agent, returning response directly")
-                response = next_query
+                response = plan
             else:
                 print("using the CodeAssistant agent")
                 response = self.codeassistant.generate_and_test_code(next_query)
