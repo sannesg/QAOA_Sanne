@@ -8,6 +8,7 @@ from langchain_core.documents import Document
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 import ast
 from langchain.schema import Document
@@ -26,22 +27,22 @@ from langchain.schema import Document
 #     return extracted_docs
 
 
-def extract_class_docstrings_from_documents(docs):
-    extracted_docs = []
+# def extract_class_docstrings_from_documents(docs:List[Document]) -> str:
+#     extracted_docs = []
 
-    for doc in docs:
-        try:
-            tree = ast.parse(doc.page_content)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ClassDef):
-                    docstring = ast.get_docstring(node)
-                    if docstring:
-                        extracted_docs.append(
-                            page_content=docstring.strip(), metadata=doc.metadata
-                        )
-        except SyntaxError:  # Skip documents that can't be parsed
-            continue
-    return extracted_docs
+#     for doc in docs:
+#         try:
+#             tree = ast.parse(doc.page_content)
+#             for node in ast.walk(tree):
+#                 if isinstance(node, ast.ClassDef):
+#                     docstring = ast.get_docstring(node)
+#                     if docstring:
+#                         extracted_docs.append(
+#                             page_content=docstring.strip(), metadata=doc.metadata
+#                         )
+#         except SyntaxError:  # Skip documents that can't be parsed
+#             continue
+#     return extracted_docs
 
 
 # # ----- To load the files from the folder ------
@@ -101,6 +102,23 @@ def load_text_file(path: Path) -> str:
         return f.read()
 
 
+def extract_class_docstrings_from_string(code: str) -> str:
+    """Extract class-level docstrings from a Python source string."""
+    extracted_docs = []
+
+    try:
+        tree = ast.parse(code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                docstring = ast.get_docstring(node)
+                if docstring:
+                    extracted_docs.append(docstring.strip())
+    except SyntaxError:
+        pass  # Skip files that fail to parse
+
+    return "\n\n".join(extracted_docs)
+
+
 def load_context(paths: List[str]) -> None:
     """Loads and processes documents from the specified paths."""
     context = []
@@ -115,10 +133,39 @@ def load_context(paths: List[str]) -> None:
             context.append(load_text_file(path))
         elif path.suffix == ".py":
             py_str = load_python_script(path)
-            docstring_str = extract_class_docstrings_from_documents(py_str)
+            docstring_str = extract_class_docstrings_from_string(py_str)
             context.append(docstring_str)
         else:
             print(f"Unsupported file type - {path.suffix}. Skipping.")
 
-    print(f"Loaded {len(context)} files.")
+    print(f"\nLoaded {len(context)} files.")
     return context
+
+
+def process_documents(context_strs: List[str]) -> FAISS | None:
+    """Process and store documents in vectorstore."""
+
+    print(f"Processing {len(context_strs)} raw documents.")
+    try:
+        docs = [
+            Document(page_content=context_str.strip()) for context_str in context_strs
+        ]
+
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+        split_docs = splitter.split_documents(docs)
+        print(f"Generated {len(split_docs)} split documents.")
+
+        if not split_docs:
+            print(
+                "No documents to process after splitting. Skipping vectorstore creation."
+            )
+            return
+
+        embedding = OpenAIEmbeddings()
+
+        vectorstore = FAISS.from_documents(split_docs, embedding)
+        print(f"Created vectorstore with {len(split_docs)} documents.")
+    except Exception as e:
+        print(f"Error processing documents: {str(e)}")
+        vectorstore = None
+    return vectorstore
