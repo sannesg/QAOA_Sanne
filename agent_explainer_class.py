@@ -5,11 +5,6 @@ from langchain.chains import LLMChain
 # ----- Helper imports -----
 from agent_utils import extract_class_docstrings_from_documents, load_python_files
 
-"""
-# ----- To test Explainer with Planner -----
-from agent_planner_class_sanne import result
-"""
-
 
 class Explainer:
     def __init__(self, model="gpt-4", temperature=0):
@@ -35,6 +30,8 @@ class Explainer:
         Make it helpful so that the USER understand the overall meaning of the parts of the package and also how it is used in a code. 
         If you are explaining a method, include the class it belongs to. If you are explaining a class, include its methods and attributes there are any. If you are explaining a variable, include its type and purpose.
         Be concise and structured. 
+        If the USER asks for a specific part of the QAOA package, make sure to explain that part in detail.
+        Make subtitles for each part you explain, and do NOT use lists or numbered lists.
         Do not include anything the USER has not asked for.
 
         If you get a request that states an unvalid option, respond with:
@@ -73,10 +70,3 @@ class Explainer:
         context = self.context_chunks[chunk_index] if self.context_chunks else ""
         result = self.chain.invoke({"description": description, "context": context})
         return result.get("text", result)
-
-
-"""
-explainer = Explainer(result)
-explanation = explainer.explain()
-print("\n\nExplanation:\n\n", explanation)
-"""
