@@ -12,7 +12,7 @@ from agent_planner_class_sanne import result
 
 
 class Explainer:
-    def __init__(self, description, model="gpt-4", temperature=0):
+    def __init__(self, model="gpt-4", temperature=0):
         """
         Initialize the Explainer with the context for QAOA package components.
 
@@ -24,7 +24,6 @@ class Explainer:
         self.llm = ChatOpenAI(model=model, temperature=temperature)
         self.context = ""
         self.set_context()
-        self.description = description
         self.prompt = PromptTemplate(
             input_variables=["description", "context"],
             template="""
@@ -37,6 +36,9 @@ class Explainer:
         If you are explaining a method, include the class it belongs to. If you are explaining a class, include its methods and attributes there are any. If you are explaining a variable, include its type and purpose.
         Be concise and structured. 
         Do not include anything the USER has not asked for.
+
+        If you get a request that states an unvalid option, respond with:
+        "The [initial state/problem/mixer] '[name]' is not a valid option based on the documentation." and the list of valid options for the QAOA package.
         """,
         )
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
@@ -44,7 +46,9 @@ class Explainer:
     def set_context(self, max_chars=3000):
         """Set or update the context variable with documentation."""
         repo_path = "./qaoa"
-        docs_py = load_python_files(repo_path)
+        docs_py = load_python_files(
+            repo_path
+        )  # switched from load_python_files to load_python_script
         extracted_docs_py = extract_class_docstrings_from_documents(docs_py)
 
         all_docstrings = [
@@ -64,12 +68,10 @@ class Explainer:
             chunks.append(current)
         self.context_chunks = chunks  # Store as a list of chunks
 
-    def explain(self, chunk_index=0):
+    def explain(self, description, chunk_index=0):
         """Generate an explanation using the specified context chunk."""
         context = self.context_chunks[chunk_index] if self.context_chunks else ""
-        result = self.chain.invoke(
-            {"description": self.description, "context": context}
-        )
+        result = self.chain.invoke({"description": description, "context": context})
         return result.get("text", result)
 
 
