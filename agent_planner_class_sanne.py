@@ -1,7 +1,7 @@
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationSummaryBufferMemory
 
 
 # ----- Class imports -----
@@ -32,8 +32,13 @@ class Planner:
             temperature (float): The temperature for the language model. Default is 0.
         """
         self.llm = ChatOpenAI(model=model, temperature=temperature)
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history", input_key="description"
+        # TODO add vectorstore and embedding
+        self.memory = ConversationSummaryBufferMemory(
+            llm=self.llm,
+            memory_key="chat_history",
+            input_key="description",
+            return_messages=True,
+            max_token_limit=1000,
         )
         self.context = ""
         self.set_context()
@@ -55,9 +60,8 @@ Given the USER's input: "{description}":
 ONLY do 1 of the following 3 cases:
 --- CASE 0: Validate USER input with the context.
     - If any USER-specified initial state, problem, or mixer is NOT an exact match with an option in {context}. Then:
-     - Respond ONLY with: "The [initial state/problem/mixer] '[name]' is not a valid option based on the documentation."
-     - Also include the list of valid options for the QAOA package.
-     - Do NOT generate anything else, no code, no plans, no other explanations.
+     - Respond ONLY with: "The [initial state/problem/mixer] '[name]' is not a valid option based on the documentation." and the list of valid options for the QAOA package provided by the context.
+     - Do NOT generate anything else, no code, no plans, no titles, no other explanations.
      - You will not use a template for this case, but rather a direct response.
     - Else, continue to the next case.
 
@@ -68,7 +72,7 @@ Example of CASE 0:
 
 --- CASE 1: Generate a plan to create code using the QAOA package.
 1. If the USER requests specific code or how to implement QAOA, generate a numbered list of concise, implementation-focused steps to create a Python script using only the QAOA package and only valid intial states/mixers/problems which are explicitly written in the context. 
- - The title above the steps are ALWAYS "Plan to generate code using the QAOA package".
+ - The title above the steps are ALWAYS "CASE 1: Plan to generate code using the QAOA package".
  - Do NOT write any code or call any tools.  
  - Only describe how to do each step.  
  - Generate the numbered steps using either the user-specified or default components (Default for each component if missing in the {description}: problem = MaxkCutPowerofTwo, mixer = X, initial state = Plus).
@@ -87,7 +91,7 @@ Example of CASE 0:
 
 --- CASE 2: Generate a plan to explain the QAOA package.
 2. If the USER asks for an explanation about the QAOA package, generate a concise TWO-WORD list of components. It should be written as bullet points.
- - Title of the list is either "Plan over which components of the QAOA package to explain" or "Plan for explanation of structures and relationships in the QAOA package".
+ - Title of the list is either "CASE 2: Plan over which components of the QAOA package to explain" or "CASE 2: Plan for explanation of structures and relationships in the QAOA package".
  - Use this case if: "explain", "explanation", "components", "parts", or "structure" is in the description and "code" or "implementation" is not.
  - Include only the components that are relevant to the USER's request.
    
@@ -124,24 +128,26 @@ Remember: Be concise, focused, and precise.
         result = self.chain.invoke(
             {"description": description, "context": self.context}
         )
-        next_query = result["text"]
-        low_query = next_query.lower()
+        plan = result["text"]
+        low_plan = plan.lower()
+        next_query = "Input from USER: " + description + "\n\nPlan:\n" + plan
+        print("Plan generated:", plan)
         try:
             # Check for specific cases in the response to determine whether to use an agent (or not), if agent then which agent to use
             if (
-                "case 2" in low_query
-                or "Plan for explanation of structures and relationships in the QAOA package"
-                in low_query
-                or "Plan over which components of the QAOA package to explain"
-                in low_query
+                "case 2" in low_plan
+                or "plan for explanation" in low_plan
+                or "plan over which components" in low_plan
             ):
+                print("using the Explainer agent")
                 response = self.explainer.explain(next_query)
-            elif "case 0" in low_query or "not a valid option" in low_query:
-                response = next_query
+            elif "case 0" in low_plan or "not a valid option" in low_plan:
+                print("not using an agent, returning response directly")
+                response = plan
             else:
-                response = self.codeassistant.generate_and_test_code(
-                    next_query
-                )  # TODO skjøte sammen next_query og description slik at codeassistant får med seg begge deler
+                print("using the CodeAssistant agent")
+                response = self.codeassistant.generate_and_test_code(next_query)
+            print("Memory buffer:", self.memory.buffer)
             return response
         except Exception as e:
             print("Error during planning:", e)
@@ -158,7 +164,7 @@ Remember: Be concise, focused, and precise.
             with open(filepath, "r", encoding="utf-8") as f:
                 self.context = f.read()
         except FileNotFoundError:
-            self.context1 = "No context available."
+            self.context = "No context available."
 
 
 planner = Planner()
@@ -169,16 +175,6 @@ while True:
         break
 
     result = planner(query)
-    """
-    if "case 1" or "case 0" in result.lower():
-        print("\n\n\n\Plan:\n\n\n", result)
-        explainer = Explainer(result)
-        response = explainer.explain()
-    else:
-        # coder = CodeAssistant()
-        # response = coder.generate_and_test_code(result)
-        response = result
-    """
     print("\nAnswer:")
     print(result)
     print("-" * 40)

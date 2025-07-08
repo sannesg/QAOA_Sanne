@@ -1,14 +1,13 @@
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+from langchain.memory import ConversationSummaryBufferMemory
 
 # ----- Helper imports -----
-from agent_utils import extract_class_docstrings_from_documents, load_python_files
+from agent_utils import extract_class_docstrings_from_string, load_context
 
-"""
-# ----- To test Explainer with Planner -----
-from agent_planner_class_sanne import result
-"""
+# ----- Helper function imports -----
+from pathlib import Path
 
 
 class Explainer:
@@ -22,6 +21,13 @@ class Explainer:
             temperature (float): The temperature for the language model.
         """
         self.llm = ChatOpenAI(model=model, temperature=temperature)
+        self.memory = ConversationSummaryBufferMemory(
+            llm=self.llm,
+            memory_key="chat_history",
+            input_key="description",
+            return_messages=True,
+            max_token_limit=1000,
+        )
         self.context = ""
         self.set_context()
         self.prompt = PromptTemplate(
@@ -35,6 +41,8 @@ class Explainer:
         Make it helpful so that the USER understand the overall meaning of the parts of the package and also how it is used in a code. 
         If you are explaining a method, include the class it belongs to. If you are explaining a class, include its methods and attributes there are any. If you are explaining a variable, include its type and purpose.
         Be concise and structured. 
+        If the USER asks for a specific part of the QAOA package, make sure to explain that part in detail.
+        Make subtitles for each part you explain, and do NOT use lists or numbered lists.
         Do not include anything the USER has not asked for.
 
         If you get a request that states an unvalid option, respond with:
@@ -43,8 +51,21 @@ class Explainer:
         )
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
 
-    def set_context(self, max_chars=3000):
+    def set_context(self):
         """Set or update the context variable with documentation."""
+        folder_path = Path(r"C:\Users\sanne\QAOA_Sanne\qaoa")
+        file_paths = [
+            str(file)
+            for file in folder_path.rglob("*")
+            if file.is_file() and file.suffix in [".py", ".ipynb", ".txt", ".md"]
+        ]
+
+        self.context = [
+            extract_class_docstrings_from_string(text)
+            for text in load_context(file_paths)
+        ]
+
+        """
         repo_path = "./qaoa"
         docs_py = load_python_files(
             repo_path
@@ -67,16 +88,17 @@ class Explainer:
         if current:
             chunks.append(current)
         self.context_chunks = chunks  # Store as a list of chunks
+        """
 
     def explain(self, description, chunk_index=0):
         """Generate an explanation using the specified context chunk."""
-        context = self.context_chunks[chunk_index] if self.context_chunks else ""
+        context = self.context[chunk_index] if self.context else ""
         result = self.chain.invoke({"description": description, "context": context})
         return result.get("text", result)
 
 
 """
-explainer = Explainer(result)
-explanation = explainer.explain()
-print("\n\nExplanation:\n\n", explanation)
+explainer = Explainer()
+result = explainer.explain("QAOA class, Problems classes, Mixers classes, Initial states classes")
+print(result)
 """
