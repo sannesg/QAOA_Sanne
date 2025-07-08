@@ -58,17 +58,14 @@ class Explainer:
     def set_context(self):
         """Set or update the context variable with documentation."""
         folder_path = Path(r"C:\Users\sanne\QAOA_Sanne\qaoa")
-        file_paths = [
-            str(file)
-            for file in folder_path.rglob("*")
-            if file.is_file() and file.suffix in [".py", ".ipynb", ".txt", ".md"]
+
+        # Only get .py files for docstring extraction
+        py_file_paths = [
+            str(file) for file in folder_path.rglob("*.py") if file.is_file()
         ]
 
-        self.context = [
-            extract_class_docstrings_from_string(text)
-            for text in load_context(file_paths)
-        ]
-
+        # Load only .py content
+        self.context = load_context(py_file_paths)
         """
         repo_path = "./qaoa"
         docs_py = load_python_files(
