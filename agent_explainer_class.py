@@ -2,9 +2,14 @@ from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.memory import ConversationSummaryBufferMemory
+from langchain_community.embeddings import OpenAIEmbeddings
 
 # ----- Helper imports -----
-from agent_utils import extract_class_docstrings_from_string, load_context
+from agent_utils import (
+    extract_class_docstrings_from_string,
+    load_context,
+    process_documents,
+)
 
 # ----- Helper function imports -----
 from pathlib import Path
@@ -44,12 +49,11 @@ class Explainer:
         If the USER asks for a specific part of the QAOA package, make sure to explain that part in detail.
         Make subtitles for each part you explain, and do NOT use lists or numbered lists.
         Do not include anything the USER has not asked for.
-
-        If you get a request that states an unvalid option, respond with:
-        "The [initial state/problem/mixer] '[name]' is not a valid option based on the documentation." and the list of valid options for the QAOA package.
         """,
         )
-        self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
+        self.chain = LLMChain(
+            llm=self.llm, prompt=self.prompt, memory=self.memory
+        )  # added memory=self.memory
 
     def set_context(self):
         """Set or update the context variable with documentation."""
