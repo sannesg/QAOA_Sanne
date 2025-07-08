@@ -4,7 +4,10 @@ from langchain.chains import LLMChain
 from langchain.memory import ConversationSummaryBufferMemory
 
 # ----- Helper imports -----
-from agent_utils import extract_class_docstrings_from_documents, load_python_files
+from agent_utils import extract_class_docstrings_from_string, load_context
+
+# ----- Helper function imports -----
+from pathlib import Path
 
 
 class Explainer:
@@ -48,8 +51,21 @@ class Explainer:
         )
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt)
 
-    def set_context(self, max_chars=3000):
+    def set_context(self):
         """Set or update the context variable with documentation."""
+        folder_path = Path(r"C:\Users\sanne\QAOA_Sanne\qaoa")
+        file_paths = [
+            str(file)
+            for file in folder_path.rglob("*")
+            if file.is_file() and file.suffix in [".py", ".ipynb", ".txt", ".md"]
+        ]
+
+        self.context = [
+            extract_class_docstrings_from_string(text)
+            for text in load_context(file_paths)
+        ]
+
+        """
         repo_path = "./qaoa"
         docs_py = load_python_files(
             repo_path
@@ -72,9 +88,17 @@ class Explainer:
         if current:
             chunks.append(current)
         self.context_chunks = chunks  # Store as a list of chunks
+        """
 
     def explain(self, description, chunk_index=0):
         """Generate an explanation using the specified context chunk."""
-        context = self.context_chunks[chunk_index] if self.context_chunks else ""
+        context = self.context[chunk_index] if self.context else ""
         result = self.chain.invoke({"description": description, "context": context})
         return result.get("text", result)
+
+
+"""
+explainer = Explainer()
+result = explainer.explain("QAOA class, Problems classes, Mixers classes, Initial states classes")
+print(result)
+"""
