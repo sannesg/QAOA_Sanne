@@ -164,7 +164,7 @@ Remember: Be concise, focused, and precise.
             with open(filepath, "r", encoding="utf-8") as f:
                 self.context = f.read()
         except FileNotFoundError:
-            self.context1 = "No context available."
+            self.context = "No context available."
 
 
 planner = Planner()
@@ -175,16 +175,6 @@ while True:
         break
 
     result = planner(query)
-    """
-    if "case 1" or "case 0" in result.lower():
-        print("\n\n\n\Plan:\n\n\n", result)
-        explainer = Explainer(result)
-        response = explainer.explain()
-    else:
-        # coder = CodeAssistant()
-        # response = coder.generate_and_test_code(result)
-        response = result
-    """
     print("\nAnswer:")
     print(result)
     print("-" * 40)
