@@ -1,4 +1,3 @@
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.memory import ConversationSummaryBufferMemory
@@ -6,9 +5,7 @@ from langchain.chat_models import init_chat_model
 
 
 # ----- Class imports -----
-from agent_explainer_class_sanne2 import (
-    Explainer,
-)  # TODO TODO TODO TRIED OUT THE NEW EXPLAINER CLASS
+from agent_explainer_class_sanne2 import Explainer
 
 # from agent_coder_dina import CodeAssistant
 

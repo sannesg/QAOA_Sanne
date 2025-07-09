@@ -1,16 +1,15 @@
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain, ConversationalRetrievalChain
-from langchain.memory import ConversationSummaryBufferMemory
+from langchain.chains import ConversationalRetrievalChain, LLMChain
+from langchain.memory import ConversationSummaryBufferMemory, ConversationBufferMemory
 from langchain.chat_models import init_chat_model
 
 # ----- Helper imports -----
-from agent_utils import SaveEmbedding
+from agent_utils import SaveEmbedding, load_context
 from pathlib import Path
 
 
 class Explainer:
-    def __init__(self):
+    def __init__(self, embedding=None):
         """
         Initialize the Explainer with the context for QAOA package components.
 
@@ -21,20 +20,24 @@ class Explainer:
         """
         self.llm = init_chat_model("openai:gpt-4.1", temperature=0)
         file_path = self.file_path()
-        make_or_get_embedding = SaveEmbedding(
-            dir_paths=file_path, collection_name="qaoa_explainer"
-        )
-        self.context = make_or_get_embedding._context()
-        self.vectorstore = make_or_get_embedding._vectorstore()
-        self.retriever = make_or_get_embedding._retriever()
-        self.memory = ConversationSummaryBufferMemory(
-            llm=self.llm,
+        self.embedding = embedding
+        self.context = ""
+
+        if embedding is not None:
+            make_or_get_embedding = SaveEmbedding(
+                dir_paths=file_path, collection_name="qaoa_explainer"
+            )
+            self.context = make_or_get_embedding._context()
+            self.vectorstore = make_or_get_embedding._vectorstore()
+            self.retriever = make_or_get_embedding._retriever()
+        else:
+            self.set_context()
+
+        self.memory = ConversationBufferMemory(
             memory_key="chat_history",
             input_key="question",
             return_messages=True,
-            max_token_limit=1000,
         )
-        self.memory.output_key = "answer"
         self.prompt = PromptTemplate(
             input_variables=["question", "context", "chat_history"],
             template="""
@@ -53,12 +56,15 @@ class Explainer:
         Do not include anything the USER has not asked for.
         """,
         )
-        self.chain = ConversationalRetrievalChain.from_llm(
-            llm=self.llm,
-            memory=self.memory,
-            retriever=self.retriever,
-            combine_docs_chain_kwargs={"prompt": self.prompt},
-        )  # added memory=self.memory
+        if embedding is not None:
+            self.chain = ConversationalRetrievalChain.from_llm(
+                llm=self.llm,
+                memory=self.memory,
+                retriever=self.retriever,
+                combine_docs_chain_kwargs={"prompt": self.prompt},
+            )
+        else:
+            self.chain = LLMChain(llm=self.llm, prompt=self.prompt, memory=self.memory)
 
     def file_path(self):
         """Set or update the context variable with documentation."""
@@ -71,13 +77,20 @@ class Explainer:
 
         return py_file_paths
 
+    def set_context(self):
+        """Set or update the context variable with documentation."""
+        self.context = load_context(self.file_path())
+
     def explain(self, question):
         """Generate an explanation using the specified context chunk."""
         result = self.chain.invoke({"question": question, "context": self.context})
         # print("\nRetrieved Documents:")
         # for i, doc in enumerate(result["source_documents"]):
         #     print(f"\n--- Document {i} ---\n{doc.page_content}")
-        return result.get("answer", result)
+        if self.embedding is not None:
+            return result.get("answer", result)
+        else:
+            return result.get("text", result)
 
 
 """
