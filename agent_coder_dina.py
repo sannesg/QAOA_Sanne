@@ -1,7 +1,10 @@
 # Load API key
 from dotenv import load_dotenv
 
+
 load_dotenv()
+
+import agent_utils
 
 import agent_utils
 
@@ -9,6 +12,11 @@ import json
 import re
 from pathlib import Path
 from typing import Dict, Any, List, Union, Optional
+import io
+import sys
+from contextlib import redirect_stdout, redirect_stderr
+import traceback
+import matplotlib
 import io
 import sys
 from contextlib import redirect_stdout, redirect_stderr
@@ -29,14 +37,19 @@ from langchain.docstore.document import Document
 
 from langchain.agents import initialize_agent, AgentType, AgentExecutor
 from langchain.chains import ConversationalRetrievalChain, RetrievalQA, LLMChain
+from langchain.chains import ConversationalRetrievalChain, RetrievalQA, LLMChain
 
 from langchain_community.vectorstores import FAISS
+
 
 # from langchain_community.embeddings import OpenAIEmbeddings
 # from langchain_community.document_loaders import DirectoryLoader
 
+# from langchain_community.document_loaders import DirectoryLoader
+
 
 class CodeAssistant:
+    def __init__(self, context_files: Optional[list[Union[str, Path]]] = None):
     def __init__(self, context_files: Optional[list[Union[str, Path]]] = None):
         self.llm = ChatOpenAI(model="gpt-4", temperature=0)
         self.tools = [self.execute_code]
@@ -57,6 +70,7 @@ class CodeAssistant:
     # @tool We don't use this as a tool anymore to save on API calls
     def execute_code(self, code: str) -> str:
         """Executes the provided Python code and returns only error messages if any occur."""
+        """Executes the provided Python code and returns only error messages if any occur."""
         try:
             # Remove Markdown code fences if present
             code = re.sub(r"^```(?:python)?", "", code.strip(), flags=re.IGNORECASE)
@@ -64,6 +78,14 @@ class CodeAssistant:
 
             # Redirect stdout to suppress circuit diagrams
             exec_globals = {}
+            f = io.StringIO()
+
+            with redirect_stdout(f), redirect_stderr(f):
+                exec(code.strip(), exec_globals)
+
+            # Only return success message if no errors
+            return "SUCCESS: Code executed without errors"
+
             f = io.StringIO()
 
             with redirect_stdout(f), redirect_stderr(f):
@@ -119,6 +141,9 @@ You have four tasks based on the input:
 Context:
 {context}
 
+Chat History:
+{chat_history}
+
 Conversation history:
 {chat_history}
 
@@ -143,6 +168,13 @@ In this case, try to find the variable that is updated and suggest using this in
         # Initialize chain that handles memory
         self.qa_chain = ConversationalRetrievalChain.from_llm(
             llm=self.llm,
+            retriever=(
+                self.vectorstore.as_retriever(
+                    search_type="similarity", search_kwargs={"k": 4}
+                )
+                if self.vectorstore
+                else None
+            ),
             retriever=(
                 self.vectorstore.as_retriever(
                     search_type="similarity", search_kwargs={"k": 4}

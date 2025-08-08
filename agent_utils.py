@@ -1,5 +1,4 @@
 # to make the code splitter
-import re
 from pathlib import Path
 from typing import List
 import json
@@ -12,6 +11,9 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 import ast
 from langchain.schema import Document
+
+import os
+from langchain_chroma import Chroma
 
 # def extract_docstrings_from_documents(docs):
 #     docstring_pattern = r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')'
@@ -44,6 +46,7 @@ from langchain.schema import Document
 #             continue
 #     return extracted_docs
 
+
 # # ----- To load the files from the folder ------
 def load_python_files(repo_path):
     """
@@ -74,6 +77,7 @@ def load_python_files(repo_path):
 
 # -----
 
+
 def load_notebook(path: Path) -> str:
     """Load Jupyter notebook content."""
     with open(path, "r", encoding="utf-8") as f:
@@ -87,15 +91,18 @@ def load_notebook(path: Path) -> str:
             # print(f"Loaded cell content:\n{cell_content}\n{'-'*50}")
     return "\n\n".join(content)
 
+
 def load_python_script(path: Path) -> str:
     """Load Python script content."""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
+
 def load_text_file(path: Path) -> str:
     """Load text or markdown file content."""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
 
 def extract_class_docstrings_from_string(code: str) -> str:
     """Extract class-level docstrings from a Python source string."""
@@ -112,6 +119,7 @@ def extract_class_docstrings_from_string(code: str) -> str:
         pass  # Skip files that fail to parse
 
     return "\n\n".join(extracted_docs)
+
 
 def load_context(paths: List[str]) -> List[str]:
     """Loads and processes documents from the specified paths."""
@@ -135,21 +143,26 @@ def load_context(paths: List[str]) -> List[str]:
     print(f"\nLoaded {len(context)} files.")
     return context
 
+
 def process_documents(context_strs: List[str]) -> FAISS | None:
     """Process and store documents in vectorstore."""
-    
+
     print(f"Processing {len(context_strs)} raw documents.")
     try:
-        docs = [Document(page_content=context_str.strip()) for context_str in context_strs]
-    
+        docs = [
+            Document(page_content=context_str.strip()) for context_str in context_strs
+        ]
+
         splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
         split_docs = splitter.split_documents(docs)
         print(f"Generated {len(split_docs)} split documents.")
-    
+
         if not split_docs:
-            print("No documents to process after splitting. Skipping vectorstore creation.")
+            print(
+                "No documents to process after splitting. Skipping vectorstore creation."
+            )
             return
-    
+
         embedding = OpenAIEmbeddings()
 
         vectorstore = FAISS.from_documents(split_docs, embedding)
@@ -158,3 +171,110 @@ def process_documents(context_strs: List[str]) -> FAISS | None:
         print(f"Error processing documents: {str(e)}")
         vectorstore = None
     return vectorstore
+
+
+class SaveEmbedding:
+    def __init__(
+        self,
+        dir_paths,
+        collection_name,
+        type_of_receiver="mmr",
+        persist_path=r"C:\Users\sanne\QAOA_Sanne\agent_embedding",
+        cache_path=r"C:\Users\sanne\QAOA_Sanne\agent_embedding_cache",
+    ):
+        self.dir_paths = dir_paths
+        self.collection_name = collection_name
+        self.persist_path = persist_path
+        self.cache_path = cache_path
+        self.context = None
+        self.split_docs = None
+        self.vectorstore = None
+        self.retriever = None
+
+        self.load_context()
+        self.split()
+        self.get_retriever(type_of_receiver)
+
+    def load_context(self):
+        """Loads and processes documents from the specified paths."""
+        context = []
+        for path in self.dir_paths:
+            path = Path(path)
+            if not path.exists():
+                print(f"File not found - {path}. Skipping.")
+                continue
+            if path.suffix == ".ipynb":
+                context.append(load_notebook(path))
+            elif path.suffix in [".txt", ".md"]:
+                context.append(load_text_file(path))
+            elif path.suffix == ".py":
+                py_str = load_python_script(path)
+                docstring_str = extract_class_docstrings_from_string(py_str)
+                context.append(docstring_str)
+            else:
+                print(f"Unsupported file type - {path.suffix}. Skipping.")
+
+        print(f"\nLoaded {len(context)} files.")
+        self.context = context
+
+    def split(self):
+        print(f"Processing {len(self.context)} raw documents.")
+        try:
+            docs = [
+                Document(page_content=context_str.strip())
+                for context_str in self.context
+            ]
+
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1500, chunk_overlap=200
+            )
+            split_docs = splitter.split_documents(docs)
+            print(f"Generated {len(split_docs)} split documents.")
+
+            if not split_docs:
+                print(
+                    "No documents to process after splitting. Skipping vectorstore creation."
+                )
+                self.split_docs = split_docs
+        except Exception as e:
+            print(f"Error processing documents: {str(e)}")
+
+    def get_retriever(self, type_of_receiver):
+        if os.path.exists(self.persist_path):
+            print(f"Loading existing vectorstore from {self.persist_path}")
+            self.vectorstore = Chroma(
+                embedding_function=OpenAIEmbeddings(),
+                persist_directory=self.persist_path,
+                collection_name=self.collection_name,
+            )
+        else:
+            print(f"Creating new vectorstore at {self.persist_path}")
+            self.vectorstore = Chroma.from_documents(
+                documents=self.split_docs,
+                embedding=OpenAIEmbeddings(),
+                persist_directory=self.persist_path,
+                collection_name=self.collection_name,
+            )
+
+        if type_of_receiver == "mmr":
+            self.retriever = self.vectorstore.as_retriever(
+                search_type="mmr",
+                search_kwargs={"k": 10, "fetch_k": 20, "lambda_mult": 0.9},
+            )
+
+        else:
+            self.retriever = self.vectorstore.as_retriever(
+                search_kwargs={"k": 8}
+            )  # TODO check out if this is what we want
+
+    def _retriever(self):
+        """Get the retriever."""
+        return self.retriever
+
+    def _vectorstore(self):
+        """Get the vectorstore."""
+        return self.vectorstore
+
+    def _context(self):
+        """Get the context."""
+        return self.context

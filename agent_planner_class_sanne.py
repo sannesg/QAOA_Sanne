@@ -1,12 +1,14 @@
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.memory import ConversationSummaryBufferMemory
+from langchain.chat_models import init_chat_model
 
 
 # ----- Class imports -----
-from agent_explainer_class import Explainer
+from agent_explainer_class_sanne2 import Explainer
 from agent_coder_dina import CodeAssistant
+
+# from agent_coder_dina import CodeAssistant
 
 
 class Planner:
@@ -14,7 +16,7 @@ class Planner:
     A planning agent that generates plans for QAOA code or explanations based on user input.
 
     Attributes:
-        model (str): The language model to use for planning. Default is "gpt-4".
+        model (str): The language model to use for planning. Default is "gpt-4.1".
         temperature (float): The temperature for the language model. Default is 0.
 
     Methods:
@@ -24,14 +26,14 @@ class Planner:
         set_context(): Sets or updates the context variable with relevant documentation.
     """
 
-    def __init__(self, model="gpt-4", temperature=0):
+    def __init__(self):
         """Initialize the planning agent with an LLM, a planning prompt, and optional context.
 
         Args:
-            model (str): The language model to use for planning. Default is "gpt-4".
+            model (str): The language model to use for planning. Default is "gpt-4.1".
             temperature (float): The temperature for the language model. Default is 0.
         """
-        self.llm = ChatOpenAI(model=model, temperature=temperature)
+        self.llm = init_chat_model("openai:gpt-4.1", temperature=0)
         # TODO add vectorstore and embedding
         self.memory = ConversationSummaryBufferMemory(
             llm=self.llm,
