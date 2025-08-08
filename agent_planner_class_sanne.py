@@ -24,7 +24,7 @@ class Planner:
         set_context(): Sets or updates the context variable with relevant documentation.
     """
 
-    def __init__(self, model="gpt-4", temperature=0):
+    def __init__(self, model="gpt-4o-mini", temperature=0):
         """Initialize the planning agent with an LLM, a planning prompt, and optional context.
 
         Args:

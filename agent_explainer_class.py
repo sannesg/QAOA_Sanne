@@ -8,7 +8,7 @@ from agent_utils import extract_class_docstrings_from_documents, load_python_fil
 
 
 class Explainer:
-    def __init__(self, model="gpt-4", temperature=0):
+    def __init__(self, model="gpt-4o-mini", temperature=0):
         """
         Initialize the Explainer with the context for QAOA package components.
 
