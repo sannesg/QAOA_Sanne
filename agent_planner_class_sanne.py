@@ -6,6 +6,7 @@ from langchain.chat_models import init_chat_model
 
 # ----- Class imports -----
 from agent_explainer_class_sanne2 import Explainer
+from agent_coder_dina import CodeAssistant
 
 # from agent_coder_dina import CodeAssistant
 
@@ -121,8 +122,8 @@ Remember: Be concise, focused, and precise.
 
         # Initialize the other agents Explainer and CodeAssistant with context files
         self.explainer = Explainer()
-        # context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
-        # self.codeassistant = CodeAssistant(context_files)
+        context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
+        self.codeassistant = CodeAssistant(context_files)
 
     def plan(self, description: str) -> str:
         """Generate a plan based on the user description and stored context."""
