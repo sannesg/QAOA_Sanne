@@ -2,9 +2,10 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import ConversationalRetrievalChain, LLMChain
 from langchain.memory import ConversationSummaryBufferMemory, ConversationBufferMemory
 from langchain.chat_models import init_chat_model
+import os
 
 # ----- Helper imports -----
-from agent_utils import SaveEmbedding, load_context
+from agent_utils import SaveEmbedding  # , load_context
 from pathlib import Path
 
 
@@ -24,14 +25,26 @@ class Explainer:
         self.context = ""
 
         if embedding is not None:
+            # Making paths where the embeddings are saved
+            # Get the directory of the current file
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+
+            # Join it with the subfolder 'explainer_embedding'
+            persist_path = os.path.join(current_dir, "explainer_embedding")
+            cache_path = os.path.join(current_dir, "explainer_embedding_cache")
+
             make_or_get_embedding = SaveEmbedding(
-                dir_paths=file_path, collection_name="qaoa_explainer"
+                dir_paths=file_path,
+                collection_name="qaoa_explainer",
+                persist_path=persist_path,
+                cache_path=cache_path,
             )
-            self.context = make_or_get_embedding._context()
-            self.vectorstore = make_or_get_embedding._vectorstore()
-            self.retriever = make_or_get_embedding._retriever()
-        else:
-            self.set_context()
+            self.context = make_or_get_embedding.get_context()
+            self.vectorstore = make_or_get_embedding.get_vectorstore()
+            self.retriever = make_or_get_embedding.get_retriever()
+            self.context = make_or_get_embedding.get_context()
+        # else:
+        # self.set_context()
 
         self.memory = ConversationBufferMemory(
             memory_key="chat_history",
@@ -77,9 +90,9 @@ class Explainer:
 
         return py_file_paths
 
-    def set_context(self):
-        """Set or update the context variable with documentation."""
-        self.context = load_context(self.file_path())
+    # def set_context(self):
+    #     """Set or update the context variable with documentation."""
+    #     self.context = load_context(self.file_path())
 
     def explain(self, question):
         """Generate an explanation using the specified context chunk."""

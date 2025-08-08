@@ -121,7 +121,7 @@ Remember: Be concise, focused, and precise.
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt, memory=self.memory)
 
         # Initialize the other agents Explainer and CodeAssistant with context files
-        self.explainer = Explainer()
+        self.explainer = Explainer(embedding=True)
         context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
         self.codeassistant = CodeAssistant(context_files)
 
