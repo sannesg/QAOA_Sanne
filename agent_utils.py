@@ -15,172 +15,14 @@ from langchain.schema import Document
 import os
 from langchain_chroma import Chroma
 
-# def extract_docstrings_from_documents(docs):
-#     docstring_pattern = r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')'
-#     extracted_docs = []
-
-#     for doc in docs:
-#         matches = re.findall(docstring_pattern, doc.page_content)
-#         for match in matches:
-#             extracted_docs.append(
-#                 Document(page_content=match.strip(), metadata=doc.metadata)
-#             )
-
-#     return extracted_docs
-
-
-# def extract_class_docstrings_from_documents(docs:List[Document]) -> str:
-#     extracted_docs = []
-
-#     for doc in docs:
-#         try:
-#             tree = ast.parse(doc.page_content)
-#             for node in ast.walk(tree):
-#                 if isinstance(node, ast.ClassDef):
-#                     docstring = ast.get_docstring(node)
-#                     if docstring:
-#                         extracted_docs.append(
-#                             page_content=docstring.strip(), metadata=doc.metadata
-#                         )
-#         except SyntaxError:  # Skip documents that can't be parsed
-#             continue
-#     return extracted_docs
-
-
-# # ----- To load the files from the folder ------
-def load_python_files(repo_path):
-    """
-    Load all Python files from the specified repository path.
-    """
-    loader_py = DirectoryLoader(repo_path, glob="**/*.py")
-    docs_py = loader_py.load()
-    return docs_py
-
-
-# def load_text_files(repo_path):
-#     """
-#     Load all text files from the specified repository path.
-#     """
-#     loader_txt = DirectoryLoader(repo_path, glob="**/*.txt")
-#     docs_txt = loader_txt.load()
-#     return docs_txt
-
-
-# # ----- To create a vector index of the split elements -----
-# def creating_vectorstore(docs):
-#     """
-#     Create a vector store from the provided documents.
-#     """
-#     embedding = OpenAIEmbeddings()
-#     vectorstore = FAISS.from_documents(docs, embedding)
-#     return vectorstore
-
-# -----
-
-
-def load_notebook(path: Path) -> str:
-    """Load Jupyter notebook content."""
-    with open(path, "r", encoding="utf-8") as f:
-        notebook = json.load(f)
-
-    content = []
-    for cell in notebook["cells"]:
-        if cell["cell_type"] in ["markdown", "code"]:
-            cell_content = "\n".join(cell["source"])
-            content.append(cell_content)
-            # print(f"Loaded cell content:\n{cell_content}\n{'-'*50}")
-    return "\n\n".join(content)
-
-
-def load_python_script(path: Path) -> str:
-    """Load Python script content."""
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def load_text_file(path: Path) -> str:
-    """Load text or markdown file content."""
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def extract_class_docstrings_from_string(code: str) -> str:
-    """Extract class-level docstrings from a Python source string."""
-    extracted_docs = []
-
-    try:
-        tree = ast.parse(code)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                docstring = ast.get_docstring(node)
-                if docstring:
-                    extracted_docs.append(docstring.strip())
-    except SyntaxError:
-        pass  # Skip files that fail to parse
-
-    return "\n\n".join(extracted_docs)
-
-
-def load_context(paths: List[str]) -> List[str]:
-    """Loads and processes documents from the specified paths."""
-    context = []
-    for path in paths:
-        path = Path(path)
-        if not path.exists():
-            print(f"File not found - {path}. Skipping.")
-            continue
-        if path.suffix == ".ipynb":
-            context.append(load_notebook(path))
-        elif path.suffix in [".txt", ".md"]:
-            context.append(load_text_file(path))
-        elif path.suffix == ".py":
-            py_str = load_python_script(path)
-            docstring_str = extract_class_docstrings_from_string(py_str)
-            context.append(docstring_str)
-        else:
-            print(f"Unsupported file type - {path.suffix}. Skipping.")
-
-    print(f"\nLoaded {len(context)} files.")
-    return context
-
-
-def process_documents(context_strs: List[str]) -> FAISS | None:
-    """Process and store documents in vectorstore."""
-
-    print(f"Processing {len(context_strs)} raw documents.")
-    try:
-        docs = [
-            Document(page_content=context_str.strip()) for context_str in context_strs
-        ]
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
-        split_docs = splitter.split_documents(docs)
-        print(f"Generated {len(split_docs)} split documents.")
-
-        if not split_docs:
-            print(
-                "No documents to process after splitting. Skipping vectorstore creation."
-            )
-            return
-
-        embedding = OpenAIEmbeddings()
-
-        vectorstore = FAISS.from_documents(split_docs, embedding)
-        print(f"Created vectorstore with {len(split_docs)} documents.")
-    except Exception as e:
-        print(f"Error processing documents: {str(e)}")
-        vectorstore = None
-    return vectorstore
-
-
 class SaveEmbedding:
     def __init__(
         self,
         dir_paths,
         collection_name,
-        type_of_receiver="mmr",
-        persist_path=r"C:\Users\sanne\QAOA_Sanne\agent_embedding",
-        cache_path=r"C:\Users\sanne\QAOA_Sanne\agent_embedding_cache",
+        persist_path,
+        cache_path,
+        type_of_receiver="mmr"
     ):
         self.dir_paths = dir_paths
         self.collection_name = collection_name
@@ -193,7 +35,51 @@ class SaveEmbedding:
 
         self.load_context()
         self.split()
-        self.get_retriever(type_of_receiver)
+        self.create_retriever(type_of_receiver)
+        
+    def load_python_files(self, repo_path):
+        """
+        Load all Python files from the specified repository path.
+        """
+        loader_py = DirectoryLoader(repo_path, glob="**/*.py")
+        docs_py = loader_py.load()
+        return docs_py
+
+    def load_notebook(self, path: Path) -> str:
+        """Load Jupyter notebook content."""
+        with open(path, "r", encoding="utf-8") as f:
+            notebook = json.load(f)
+        content = []
+        for cell in notebook["cells"]:
+            if cell["cell_type"] in ["markdown", "code"]:
+                cell_content = "\n".join(cell["source"])
+                content.append(cell_content)
+                # print(f"Loaded cell content:\n{cell_content}\n{'-'*50}")
+        return "\n\n".join(content)
+
+    def load_python_script(self, path: Path) -> str:
+        """Load Python script content."""
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def load_text_file(self, path: Path) -> str:
+        """Load text or markdown file content."""
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def extract_class_docstrings_from_string(self, code: str) -> str:
+        """Extract class-level docstrings from a Python source string."""
+        extracted_docs = []
+        try:
+            tree = ast.parse(code)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    docstring = ast.get_docstring(node)
+                    if docstring:
+                        extracted_docs.append(docstring.strip())
+        except SyntaxError:
+            pass  # Skip files that fail to parse
+        return "\n\n".join(extracted_docs)
 
     def load_context(self):
         """Loads and processes documents from the specified paths."""
@@ -204,12 +90,12 @@ class SaveEmbedding:
                 print(f"File not found - {path}. Skipping.")
                 continue
             if path.suffix == ".ipynb":
-                context.append(load_notebook(path))
+                context.append(self.load_notebook(path))
             elif path.suffix in [".txt", ".md"]:
-                context.append(load_text_file(path))
+                context.append(self.load_text_file(path))
             elif path.suffix == ".py":
-                py_str = load_python_script(path)
-                docstring_str = extract_class_docstrings_from_string(py_str)
+                py_str = self.load_python_script(path)
+                docstring_str = self.extract_class_docstrings_from_string(py_str)
                 context.append(docstring_str)
             else:
                 print(f"Unsupported file type - {path.suffix}. Skipping.")
@@ -235,11 +121,12 @@ class SaveEmbedding:
                 print(
                     "No documents to process after splitting. Skipping vectorstore creation."
                 )
-                self.split_docs = split_docs
+            
+            self.split_docs = split_docs
         except Exception as e:
             print(f"Error processing documents: {str(e)}")
 
-    def get_retriever(self, type_of_receiver):
+    def create_retriever(self, type_of_receiver):
         if os.path.exists(self.persist_path):
             print(f"Loading existing vectorstore from {self.persist_path}")
             self.vectorstore = Chroma(
@@ -248,6 +135,7 @@ class SaveEmbedding:
                 collection_name=self.collection_name,
             )
         else:
+            # print(self.split_docs)
             print(f"Creating new vectorstore at {self.persist_path}")
             self.vectorstore = Chroma.from_documents(
                 documents=self.split_docs,
@@ -267,14 +155,89 @@ class SaveEmbedding:
                 search_kwargs={"k": 8}
             )  # TODO check out if this is what we want
 
-    def _retriever(self):
+    def get_retriever(self):
         """Get the retriever."""
         return self.retriever
 
-    def _vectorstore(self):
+    def get_vectorstore(self):
         """Get the vectorstore."""
         return self.vectorstore
 
-    def _context(self):
+    def get_context(self):
         """Get the context."""
         return self.context
+    
+# def extract_docstrings_from_documents(docs):
+#     docstring_pattern = r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\')'
+#     extracted_docs = []
+
+#     for doc in docs:
+#         matches = re.findall(docstring_pattern, doc.page_content)
+#         for match in matches:
+#             extracted_docs.append(
+#                 Document(page_content=match.strip(), metadata=doc.metadata)
+#             )
+
+#     return extracted_docs
+
+# def extract_class_docstrings_from_documents(docs:List[Document]) -> str:
+#     extracted_docs = []
+
+#     for doc in docs:
+#         try:
+#             tree = ast.parse(doc.page_content)
+#             for node in ast.walk(tree):
+#                 if isinstance(node, ast.ClassDef):
+#                     docstring = ast.get_docstring(node)
+#                     if docstring:
+#                         extracted_docs.append(
+#                             page_content=docstring.strip(), metadata=doc.metadata
+#                         )
+#         except SyntaxError:  # Skip documents that can't be parsed
+#             continue
+#     return extracted_docs
+
+# def load_text_files(repo_path):
+#     """
+#     Load all text files from the specified repository path.
+#     """
+#     loader_txt = DirectoryLoader(repo_path, glob="**/*.txt")
+#     docs_txt = loader_txt.load()
+#     return docs_txt
+
+# def creating_vectorstore(docs):
+#     """
+#     Create a vector store from the provided documents.
+#     """
+#     embedding = OpenAIEmbeddings()
+#     vectorstore = FAISS.from_documents(docs, embedding)
+#     return vectorstore
+
+
+# def process_documents(context_strs: List[str]) -> FAISS | None:
+#     """Process and store documents in vectorstore."""
+
+#     print(f"Processing {len(context_strs)} raw documents.")
+#     try:
+#         docs = [
+#             Document(page_content=context_str.strip()) for context_str in context_strs
+#         ]
+
+#         splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+#         split_docs = splitter.split_documents(docs)
+#         print(f"Generated {len(split_docs)} split documents.")
+
+#         if not split_docs:
+#             print(
+#                 "No documents to process after splitting. Skipping vectorstore creation."
+#             )
+#             return
+
+#         embedding = OpenAIEmbeddings()
+
+#         vectorstore = FAISS.from_documents(split_docs, embedding)
+#         print(f"Created vectorstore with {len(split_docs)} documents.")
+#     except Exception as e:
+#         print(f"Error processing documents: {str(e)}")
+#         vectorstore = None
+#     return vectorstore

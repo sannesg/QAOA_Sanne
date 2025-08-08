@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import agent_utils
+from agent_utils import SaveEmbedding
 
 import json
 import re
@@ -47,14 +47,16 @@ class CodeAssistant:
             return_messages=True,
             max_token_limit=1000,  # Limit memory size to avoid excessive context
         )
-        self.vectorstore = None
-        if context_files:
-            self.context = agent_utils.load_context(context_files)
-            self.vectorstore = agent_utils.process_documents(self.context)
-
+        # self.vectorstore = None
+        # if context_files:
+        #     self.context = agent_utils.load_context(context_files)
+        #     self.vectorstore = agent_utils.process_documents(self.context)
+        embedding = SaveEmbedding(context_files, "CodeAssistant_embedding", "embeddings/CodeAssistant_embedding", "embeddings/CodeAssistant_cache")
+        self.vectorstore = embedding.get_vectorstore()
+        self.retriever = embedding.get_retriever()
+        self.context = embedding.get_context()
         self._initialize_agent()
 
-    # @tool We don't use this as a tool anymore to save on API calls
     def execute_code(self, code: str) -> str:
         """Executes the provided Python code and returns only error messages if any occur."""
         try:
@@ -80,9 +82,6 @@ class CodeAssistant:
         self, context_files: Optional[list[Union[str, Path]]] = None
     ) -> None:
         """Initialize and return the agent executor."""
-        # Define prompts
-        if context_files:
-            self.context = agent_utils.load_context(context_files)
 
         code_suggestion_prompt = PromptTemplate(
             input_variables=["context", "question"],
