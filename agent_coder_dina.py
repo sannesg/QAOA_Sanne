@@ -236,30 +236,31 @@ Guidelines:
         return text.strip()
 
 
-# Example usage
-context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
-assistant = CodeAssistant(context_files)
+if __name__ == "__main__":
+    # Example usage
+    context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
+    assistant = CodeAssistant(context_files)
 
-# # query = "Create a random connected graph with 10 nodes. Include visualization."
-# query = "Create a qaoa instance using onehot encoding."
+    # # query = "Create a random connected graph with 10 nodes. Include visualization."
+    # query = "Create a qaoa instance using onehot encoding."
 
-# final_code = assistant.generate_and_test_code(query)
-# print("\nFinal response:")
-# print(final_code)
+    # final_code = assistant.generate_and_test_code(query)
+    # print("\nFinal response:")
+    # print(final_code)
 
-# First query
-query1 = "Create a qaoa instance using onehot encoding."
-print("\n--- First Query ---")
-final_code1 = assistant.generate_and_test_code(query1)
-print("\nFinal response to first query:")
-print(final_code1)
+    # First query
+    query1 = "Create a qaoa instance using onehot encoding."
+    print("\n--- First Query ---")
+    final_code1 = assistant.generate_and_test_code(query1)
+    print("\nFinal response to first query:")
+    print(final_code1)
 
-# Second query relies on memory of the first one
-query2 = "Can you explain why you used onehot encoding?"
-print("\n--- Second Query ---")
-final_response2 = assistant.qa_chain.invoke({"question": query2})
-print("\nFinal response to second query:")
-print(final_response2["answer"])
+    # Second query relies on memory of the first one
+    query2 = "Can you explain why you used onehot encoding?"
+    print("\n--- Second Query ---")
+    final_response2 = assistant.qa_chain.invoke({"question": query2})
+    print("\nFinal response to second query:")
+    print(final_response2["answer"])
 
-print("\n--- Memory Summary ---")
-print(assistant.memory.buffer)
+    print("\n--- Memory Summary ---")
+    print(assistant.memory.buffer)
