@@ -104,10 +104,7 @@ class CodeAssistant:
         self, context_files: Optional[list[Union[str, Path]]] = None
     ) -> None:
         """Initialize and return the agent executor."""
-        # Define prompts
-        if context_files:
-            self.context = agent_utils.load_context(context_files)
-
+        
         code_suggestion_prompt = PromptTemplate(
             input_variables=["context", "question"],
             template="""You are a AI, a Python coding assistant. 
