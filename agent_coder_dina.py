@@ -1,10 +1,7 @@
 # Load API key
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
-import agent_utils
 
 import agent_utils
 
@@ -12,11 +9,6 @@ import json
 import re
 from pathlib import Path
 from typing import Dict, Any, List, Union, Optional
-import io
-import sys
-from contextlib import redirect_stdout, redirect_stderr
-import traceback
-import matplotlib
 import io
 import sys
 from contextlib import redirect_stdout, redirect_stderr
@@ -37,19 +29,14 @@ from langchain.docstore.document import Document
 
 from langchain.agents import initialize_agent, AgentType, AgentExecutor
 from langchain.chains import ConversationalRetrievalChain, RetrievalQA, LLMChain
-from langchain.chains import ConversationalRetrievalChain, RetrievalQA, LLMChain
 
 from langchain_community.vectorstores import FAISS
-
 
 # from langchain_community.embeddings import OpenAIEmbeddings
 # from langchain_community.document_loaders import DirectoryLoader
 
-# from langchain_community.document_loaders import DirectoryLoader
-
 
 class CodeAssistant:
-    def __init__(self, context_files: Optional[list[Union[str, Path]]] = None):
     def __init__(self, context_files: Optional[list[Union[str, Path]]] = None):
         self.llm = ChatOpenAI(model="gpt-4", temperature=0)
         self.tools = [self.execute_code]
@@ -70,7 +57,6 @@ class CodeAssistant:
     # @tool We don't use this as a tool anymore to save on API calls
     def execute_code(self, code: str) -> str:
         """Executes the provided Python code and returns only error messages if any occur."""
-        """Executes the provided Python code and returns only error messages if any occur."""
         try:
             # Remove Markdown code fences if present
             code = re.sub(r"^```(?:python)?", "", code.strip(), flags=re.IGNORECASE)
@@ -86,47 +72,18 @@ class CodeAssistant:
             # Only return success message if no errors
             return "SUCCESS: Code executed without errors"
 
-            f = io.StringIO()
-
-            with redirect_stdout(f), redirect_stderr(f):
-                exec(code.strip(), exec_globals)
-
-            # Only return success message if no errors
-            return "SUCCESS: Code executed without errors"
-
         except Exception as e:
             # Return just the error type and message, not full traceback
             return f"ERROR: {type(e).__name__}: {str(e)}"
-
-    # def _process_documents(self, paths: List[str]) -> None:
-    #     """Process and store documents in vectorstore."""
-    #     docs_str = agent_utils.load_context(paths)
-
-    #     print(f"Processing {len(docs_str)} raw documents.")
-    #     try:
-    #         docs = [Document(page_content=doc.strip()) for doc in docs_str]
-
-    #         splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
-    #         split_docs = splitter.split_documents(docs)
-    #         print(f"Generated {len(split_docs)} split documents.")
-
-    #         if not split_docs:
-    #             print("No documents to process after splitting. Skipping vectorstore creation.")
-    #             return
-
-    #         embedding = OpenAIEmbeddings()
-
-    #         self.vectorstore = FAISS.from_documents(split_docs, embedding)
-    #         print(f"Created vectorstore with {len(split_docs)} documents.")
-    #     except Exception as e:
-    #         print(f"Error processing documents: {str(e)}")
-    #         self.vectorstore = None
 
     def _initialize_agent(
         self, context_files: Optional[list[Union[str, Path]]] = None
     ) -> None:
         """Initialize and return the agent executor."""
-        
+        # Define prompts
+        if context_files:
+            self.context = agent_utils.load_context(context_files)
+
         code_suggestion_prompt = PromptTemplate(
             input_variables=["context", "question"],
             template="""You are a AI, a Python coding assistant. 
@@ -140,9 +97,6 @@ You have four tasks based on the input:
 
 Context:
 {context}
-
-Chat History:
-{chat_history}
 
 Conversation history:
 {chat_history}
@@ -168,13 +122,6 @@ In this case, try to find the variable that is updated and suggest using this in
         # Initialize chain that handles memory
         self.qa_chain = ConversationalRetrievalChain.from_llm(
             llm=self.llm,
-            retriever=(
-                self.vectorstore.as_retriever(
-                    search_type="similarity", search_kwargs={"k": 4}
-                )
-                if self.vectorstore
-                else None
-            ),
             retriever=(
                 self.vectorstore.as_retriever(
                     search_type="similarity", search_kwargs={"k": 4}
@@ -259,13 +206,6 @@ if __name__ == "__main__":
     context_files = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]
     assistant = CodeAssistant(context_files)
 
-    # query = "Create a random connected graph with 10 nodes. Include visualization."
-    # query = "Create a qaoa instance using onehot encoding."
-
-    # final_code = assistant.generate_and_test_code(query)
-    # print("\nFinal response:")
-    # print(final_code)
-
     # First query
     query1 = "Create a qaoa instance using onehot encoding."
     print("\nFirst query: ")
@@ -283,7 +223,7 @@ if __name__ == "__main__":
     print(f"\033[1m{final_response2["answer"]}\033[0m")
 
     # Third query
-    query3 = """Create a qaoa circuit that solves the max k-cut problem for this graph
+    query3 = """Create a qaoa circuit solving the max k-cut problem with k = 3 for this 10-node graph using binary encoding and the full hamiltonian:
         graph [
     node [
         id 0
@@ -446,7 +386,6 @@ if __name__ == "__main__":
         weight 0.11336603624375363
     ]
     ]
-    for k = 3 using binary encoding and the full hamiltonian.
     Visualize both the graph and the circuit."""
     print("\nThird query: ")
     print(f"\033[1m{query3}\033[0m")
