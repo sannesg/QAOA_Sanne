@@ -1,5 +1,6 @@
 # Load API key
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import agent_utils
@@ -18,7 +19,11 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from langchain.tools import tool
 from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory, ConversationSummaryBufferMemory
+from langchain.memory import (
+    ConversationBufferMemory,
+    ConversationSummaryMemory,
+    ConversationSummaryBufferMemory,
+)
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document
 
@@ -26,16 +31,18 @@ from langchain.agents import initialize_agent, AgentType, AgentExecutor
 from langchain.chains import ConversationalRetrievalChain, RetrievalQA, LLMChain
 
 from langchain_community.vectorstores import FAISS
+
 # from langchain_community.embeddings import OpenAIEmbeddings
 # from langchain_community.document_loaders import DirectoryLoader
 
+
 class CodeAssistant:
-    def __init__(self, context_files: Optional[list[Union[str, Path]]]=None):
+    def __init__(self, context_files: Optional[list[Union[str, Path]]] = None):
         self.llm = ChatOpenAI(model="gpt-4", temperature=0)
         self.tools = [self.execute_code]
         self.memory = ConversationSummaryBufferMemory(
             llm=self.llm,
-            memory_key="chat_history", # See prompt template for usage
+            memory_key="chat_history",  # See prompt template for usage
             input_key="question",
             return_messages=True,
             max_token_limit=1000,  # Limit memory size to avoid excessive context
@@ -44,9 +51,9 @@ class CodeAssistant:
         if context_files:
             self.context = agent_utils.load_context(context_files)
             self.vectorstore = agent_utils.process_documents(self.context)
-            
+
         self._initialize_agent()
-        
+
     # @tool We don't use this as a tool anymore to save on API calls
     def execute_code(self, code: str) -> str:
         """Executes the provided Python code and returns only error messages if any occur."""
@@ -58,33 +65,33 @@ class CodeAssistant:
             # Redirect stdout to suppress circuit diagrams
             exec_globals = {}
             f = io.StringIO()
-            
+
             with redirect_stdout(f), redirect_stderr(f):
                 exec(code.strip(), exec_globals)
-                
+
             # Only return success message if no errors
             return "SUCCESS: Code executed without errors"
-            
+
         except Exception as e:
             # Return just the error type and message, not full traceback
             return f"ERROR: {type(e).__name__}: {str(e)}"
-    
+
     # def _process_documents(self, paths: List[str]) -> None:
     #     """Process and store documents in vectorstore."""
     #     docs_str = agent_utils.load_context(paths)
-        
+
     #     print(f"Processing {len(docs_str)} raw documents.")
     #     try:
     #         docs = [Document(page_content=doc.strip()) for doc in docs_str]
-        
+
     #         splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
     #         split_docs = splitter.split_documents(docs)
     #         print(f"Generated {len(split_docs)} split documents.")
-        
+
     #         if not split_docs:
     #             print("No documents to process after splitting. Skipping vectorstore creation.")
     #             return
-        
+
     #         embedding = OpenAIEmbeddings()
 
     #         self.vectorstore = FAISS.from_documents(split_docs, embedding)
@@ -92,13 +99,15 @@ class CodeAssistant:
     #     except Exception as e:
     #         print(f"Error processing documents: {str(e)}")
     #         self.vectorstore = None
-            
-    def _initialize_agent(self, context_files: Optional[list[Union[str, Path]]]=None) -> None:
+
+    def _initialize_agent(
+        self, context_files: Optional[list[Union[str, Path]]] = None
+    ) -> None:
         """Initialize and return the agent executor."""
         # Define prompts
         if context_files:
             self.context = agent_utils.load_context(context_files)
-        
+
         code_suggestion_prompt = PromptTemplate(
             input_variables=["context", "question"],
             template="""You are a AI, a Python coding assistant. 
@@ -132,110 +141,127 @@ In this case, try to find the variable that is updated and suggest using this in
 9. After generating code, briefly explain the approach and any potential limitations in the code or discrepancies between the code and the task.
 10. For parts of the task that are unspecified, provide brief reasoning for your choices.
 11. Refer to previous tasks and responses in the conversation to maintain context and continuity.
-"""
-)       
+""",
+        )
         # Initialize chain that handles memory
         self.qa_chain = ConversationalRetrievalChain.from_llm(
             llm=self.llm,
-            retriever=self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4}) if self.vectorstore else None,
+            retriever=(
+                self.vectorstore.as_retriever(
+                    search_type="similarity", search_kwargs={"k": 4}
+                )
+                if self.vectorstore
+                else None
+            ),
             memory=self.memory,
             combine_docs_chain_kwargs={
                 "prompt": code_suggestion_prompt,
-            }
+            },
         )
-    
+
     # Main function
     def generate_and_test_code(self, query: str, max_iterations: int = 3) -> None:
         """Generate code, test it, and improve based on feedback."""
         current_code = None
         error_analysis = None
         # last_error = None
-        
+
         for iteration in range(max_iterations):
             print(f"\033[90m\n--- Iteration {iteration + 1} ---\033[0m")
-            
+
             # Generate new or improve old code
             if current_code is None:
                 print("\033[90m\nGenerating initial response...\033[0m")
-                result = self.qa_chain.invoke({
-                    "question": query})
+                result = self.qa_chain.invoke({"question": query})
             else:
                 print("\033[90m\nImproving response based on previous error...\033[0m")
-                result = self.qa_chain.invoke({
-                    "question": f"Improve this code based on the following feedback: {error_analysis}\nOriginal task: {query}\nCode:\n{self._extract_code_block(current_code)}"
-                }) 
-                
-            current_code = result["answer"] # Extract response text
-            
+                result = self.qa_chain.invoke(
+                    {
+                        "question": f"Improve this code based on the following feedback: {error_analysis}\nOriginal task: {query}\nCode:\n{self._extract_code_block(current_code)}"
+                    }
+                )
+
+            current_code = result["answer"]  # Extract response text
+
             print("\033[90m\nResponse:\033[0m")
             print(f"\033[90m\n{current_code}\033[0m")
-            
+
             # Execute the code if it contains a code block
             if "```" in current_code:
-                matplotlib.use("Agg")  # Use a non-interactive backend for matplotlib (no verbose output in console)
+                matplotlib.use(
+                    "Agg"
+                )  # Use a non-interactive backend for matplotlib (no verbose output in console)
                 print("\033[96m\nExecuting code...\033[0m")
-                execution_result = self.execute_code(self._extract_code_block(current_code))
+                execution_result = self.execute_code(
+                    self._extract_code_block(current_code)
+                )
                 matplotlib.use("TkAgg")  # Reset to default backend
                 print(f"\033[96m{execution_result}\033[0m")
                 if "ERROR" in execution_result:
                     print(f"\033[96m\nGenerating error analysis...\033[0m")
-                    result = self.qa_chain.invoke({
-                        "question": f"""Analyze the following error: {execution_result}. 
-                        Provide suggestions for improving the code without generating new code."""})
+                    result = self.qa_chain.invoke(
+                        {
+                            "question": f"""Analyze the following error: {execution_result}. 
+                        Provide suggestions for improving the code without generating new code."""
+                        }
+                    )
                     error_analysis = result["answer"]
                     print(f"\033[96mError analysis: {error_analysis}\033[0m")
                 else:
-                    return current_code # Return the response if no errors occurred
-                
+                    return current_code  # Return the response if no errors occurred
+
             else:
                 return current_code
-        
+
         print(f"\nReached maximum iterations ({max_iterations})")
-        return current_code # Return the last generated response when max tries are reached
+        return current_code  # Return the last generated response when max tries are reached
 
     def _extract_code_block(self, text: str) -> str:
         """Extract code from markdown block."""
-        match = re.search(r'```python(.*?)```', text, re.DOTALL)
+        match = re.search(r"```python(.*?)```", text, re.DOTALL)
         if match:
             return match.group(1).strip()
         return text.strip()
 
-# Example usage
-context_files = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]
-assistant = CodeAssistant(context_files)
 
-# query = "Create a random connected graph with 10 nodes. Include visualization."
-# query = "Create a qaoa instance using onehot encoding."
+if __name__ == "__main__":
 
-# final_code = assistant.generate_and_test_code(query)
-# print("\nFinal response:")
-# print(final_code)
+    # Example usage
+    context_files = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]
+    assistant = CodeAssistant(context_files)
 
-# First query
-query1 = "Create a qaoa instance using onehot encoding."
-print("\nFirst query: ")
-print(f"\033[1m{query1}\033[0m")
-final_code1 = assistant.generate_and_test_code(query1)
-print("\nFinal response to first query:")
-print(f"\033[1m{final_code1}\033[0m")
+    # query = "Create a random connected graph with 10 nodes. Include visualization."
+    # query = "Create a qaoa instance using onehot encoding."
 
-# Second query relies on memory of the first one
-query2 = "Why did you choose the initial state and mixer like that?"
-print("\nSecond query: ")
-print(f"\033[1m{query2}\033[0m")
-final_response2 = assistant.qa_chain.invoke({"question": query2})
-print("\nFinal response to second query:")
-print(f"\033[1m{final_response2["answer"]}\033[0m")
+    # final_code = assistant.generate_and_test_code(query)
+    # print("\nFinal response:")
+    # print(final_code)
 
-# Third query
-query3 = """Create a qaoa circuit using a random 10-node connected graph for k = 3 using binary encoding and the full hamiltonian.
-Visualize both the graph and the circuit."""
-print("\nThird query: ")
-print(f"\033[1m{query3}\033[0m")
-final_code3 = assistant.generate_and_test_code(query3)
-print("\nFinal response to third query:")
-print(f"\033[1m{final_code3}\033[0m")
+    # First query
+    query1 = "Create a qaoa instance using onehot encoding."
+    print("\nFirst query: ")
+    print(f"\033[1m{query1}\033[0m")
+    final_code1 = assistant.generate_and_test_code(query1)
+    print("\nFinal response to first query:")
+    print(f"\033[1m{final_code1}\033[0m")
 
-# # Print memory summary
-# print("\033[95m\nMemory summary:\033[0m")
-# print(f"\033[95m{assistant.memory.buffer}\033[0m") 
+    # Second query relies on memory of the first one
+    query2 = "Why did you choose the initial state and mixer like that?"
+    print("\nSecond query: ")
+    print(f"\033[1m{query2}\033[0m")
+    final_response2 = assistant.qa_chain.invoke({"question": query2})
+    print("\nFinal response to second query:")
+    print(f"\033[1m{final_response2["answer"]}\033[0m")
+
+    # Third query
+    query3 = """Create a qaoa circuit using a random 10-node connected graph for k = 3 using binary encoding and the full hamiltonian.
+    Visualize both the graph and the circuit."""
+    print("\nThird query: ")
+    print(f"\033[1m{query3}\033[0m")
+    final_code3 = assistant.generate_and_test_code(query3)
+    print("\nFinal response to third query:")
+    print(f"\033[1m{final_code3}\033[0m")
+
+    # # Print memory summary
+    # print("\033[95m\nMemory summary:\033[0m")
+    # print(f"\033[95m{assistant.memory.buffer}\033[0m")
