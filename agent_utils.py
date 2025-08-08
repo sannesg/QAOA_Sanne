@@ -178,6 +178,7 @@ class SaveEmbedding:
         self,
         dir_paths,
         collection_name,
+        type_of_receiver="mmr",
         persist_path=r"C:\Users\sanne\QAOA_Sanne\agent_embedding",
         cache_path=r"C:\Users\sanne\QAOA_Sanne\agent_embedding_cache",
     ):
@@ -192,7 +193,7 @@ class SaveEmbedding:
 
         self.load_context()
         self.split()
-        self.get_retriever()
+        self.get_retriever(type_of_receiver)
 
     def load_context(self):
         """Loads and processes documents from the specified paths."""
@@ -238,7 +239,7 @@ class SaveEmbedding:
         except Exception as e:
             print(f"Error processing documents: {str(e)}")
 
-    def get_retriever(self):
+    def get_retriever(self, type_of_receiver):
         if os.path.exists(self.persist_path):
             print(f"Loading existing vectorstore from {self.persist_path}")
             self.vectorstore = Chroma(
@@ -255,9 +256,16 @@ class SaveEmbedding:
                 collection_name=self.collection_name,
             )
 
-        self.retriever = self.vectorstore.as_retriever(
-            search_kwargs={"k": 8}
-        )  # TODO check out if this is what we want
+        if type_of_receiver == "mmr":
+            self.retriever = self.vectorstore.as_retriever(
+                search_type="mmr",
+                search_kwargs={"k": 10, "fetch_k": 20, "lambda_mult": 0.9},
+            )
+
+        else:
+            self.retriever = self.vectorstore.as_retriever(
+                search_kwargs={"k": 8}
+            )  # TODO check out if this is what we want
 
     def _retriever(self):
         """Get the retriever."""
@@ -270,8 +278,3 @@ class SaveEmbedding:
     def _context(self):
         """Get the context."""
         return self.context
-
-
-try_embedding = SaveEmbedding(
-    dir_paths=[r"C:\Users\sanne\QAOA_Sanne\qaoa"], collection_name="qaoa_explainer"
-)

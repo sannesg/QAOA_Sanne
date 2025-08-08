@@ -236,6 +236,7 @@ Guidelines:
         return text.strip()
 
 
+"""
 # Example usage
 context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
 assistant = CodeAssistant(context_files)
@@ -263,3 +264,4 @@ print(final_response2["answer"])
 
 print("\n--- Memory Summary ---")
 print(assistant.memory.buffer)
+"""

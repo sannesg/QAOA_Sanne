@@ -2,20 +2,17 @@ from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.memory import ConversationSummaryBufferMemory
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
 
 # ----- Helper imports -----
 from agent_utils import (
     process_documents,
-    extract_class_docstrings_from_string,
     load_context,
 )
 from pathlib import Path
 
 
 class Explainer:
-    def __init__(self, model="gpt-4", temperature=0):
+    def __init__(self, model="gpt-4.1", temperature=0):
         """
         Initialize the Explainer with the context for QAOA package components.
 
@@ -24,7 +21,7 @@ class Explainer:
             model (str): The language model to use.
             temperature (float): The temperature for the language model.
         """
-        self.llm = ChatOpenAI(model=model, temperature=temperature)
+        self.llm = ChatOpenAI(model_name=model, temperature=temperature)
         self.context = ""
         self.set_total_context()  # Set the total context, a.k.a. the documentation strings
         self.query_context = ""  # This will hold the context for the specific query
