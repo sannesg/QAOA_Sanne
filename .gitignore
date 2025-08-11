@@ -137,3 +137,4 @@ dmypy.json
 
 # Embedding for agent 
 agent_embedding
+embeddings/
