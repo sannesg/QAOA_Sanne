@@ -122,8 +122,7 @@ Remember: Be concise, focused, and precise.
 
         # Initialize the other agents Explainer and CodeAssistant with context files
         self.explainer = Explainer(embedding=True)
-        context_files = ["./examples/MaxCut/KCutExamples.ipynb"]
-        self.codeassistant = CodeAssistant(context_files)
+        self.codeassistant = CodeAssistant()
 
     def plan(self, description: str) -> str:
         """Generate a plan based on the user description and stored context."""
