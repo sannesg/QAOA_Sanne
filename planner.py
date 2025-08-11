@@ -167,15 +167,15 @@ Remember: Be concise, focused, and precise.
         except FileNotFoundError:
             self.context = "No context available."
 
+if __name__ == "__main__":
+    planner = Planner()
+    while True:
+        query = input("Ask a question (or 'exit' to quit): ")
+        if query.lower() in ["exit", "quit"]:
+            print("Goodbye!")
+            break
 
-planner = Planner()
-while True:
-    query = input("Ask a question (or 'exit' to quit): ")
-    if query.lower() in ["exit", "quit"]:
-        print("Goodbye!")
-        break
-
-    result = planner(query)
-    print("\nAnswer:")
-    print(result)
-    print("-" * 40)
+        result = planner(query)
+        print("\nAnswer:")
+        print(result)
+        print("-" * 40)
