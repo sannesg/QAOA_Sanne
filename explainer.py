@@ -81,7 +81,11 @@ class Explainer:
 
     def file_path(self):
         """Set or update the context variable with documentation."""
-        folder_path = Path(r"C:\Users\sanne\QAOA_Sanne\qaoa")
+        script_dir = Path(__file__).resolve().parent
+
+        # Path to the 'qaoa' folder next to it
+        folder_path = script_dir / "qaoa"
+        # folder_path = Path(r"C:\Users\sanne\QAOA_Sanne\qaoa")
 
         # Only get .py files for docstring extraction
         py_file_paths = [
