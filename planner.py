@@ -148,7 +148,7 @@ Remember: Be concise, focused, and precise.
             else:
                 print("using the CodeAssistant agent")
                 response = self.codeassistant.generate_and_test_code(next_query)
-            print("Memory buffer:", self.memory.buffer)
+            # print("Memory buffer:", self.memory.buffer)
             return response
         except Exception as e:
             print("Error during planning:", e)
