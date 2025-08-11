@@ -37,7 +37,7 @@ from langchain_community.vectorstores import FAISS
 
 
 class CodeAssistant:
-    def __init__(self, context_files: Optional[list[Union[str, Path]]] = None):
+    def __init__(self, context_files: Optional[list[Union[str, Path]]] = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]):
         self.llm = ChatOpenAI(model="gpt-4", temperature=0)
         self.tools = [self.execute_code]
         self.memory = ConversationSummaryBufferMemory(
