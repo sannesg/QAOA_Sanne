@@ -30,12 +30,12 @@ class Explainer:
             current_dir = os.path.dirname(os.path.abspath(__file__))
 
             # Join it with the subfolder 'explainer_embedding'
-            persist_path = os.path.join(current_dir, "explainer_embedding")
-            cache_path = os.path.join(current_dir, "explainer_embedding_cache")
+            persist_path = os.path.join(current_dir, "embeddings\Explainer_embedding")
+            cache_path = os.path.join(current_dir, "embeddings\Explainer_cache")
 
             make_or_get_embedding = SaveEmbedding(
                 dir_paths=file_path,
-                collection_name="qaoa_explainer",
+                collection_name="Explainer_embedding",
                 persist_path=persist_path,
                 cache_path=cache_path,
             )
