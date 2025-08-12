@@ -1,11 +1,11 @@
 from langchain.prompts import PromptTemplate
 from langchain.chains import ConversationalRetrievalChain, LLMChain
-from langchain.memory import ConversationSummaryBufferMemory, ConversationBufferMemory
+from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import init_chat_model
 import os
 
 # ----- Helper imports -----
-from agent_utils import SaveEmbedding  # , load_context
+from agent_utils import SaveEmbedding
 from pathlib import Path
 
 
@@ -33,18 +33,19 @@ class Explainer:
             persist_path = os.path.join(current_dir, "embeddings\Explainer_embedding")
             cache_path = os.path.join(current_dir, "embeddings\Explainer_cache")
 
+            # Create or extract an embedding that is saved in the persist_path
             make_or_get_embedding = SaveEmbedding(
                 dir_paths=file_path,
                 collection_name="Explainer_embedding",
                 persist_path=persist_path,
                 cache_path=cache_path,
             )
+
+            # Get the context, vectorstore, and retriever from the embedding
             self.context = make_or_get_embedding.get_context()
             self.vectorstore = make_or_get_embedding.get_vectorstore()
             self.retriever = make_or_get_embedding.get_retriever()
-            self.context = make_or_get_embedding.get_context()
-        # else:
-        # self.set_context()
+
         if memory is not None:
             self.memory = memory
         else: 
@@ -71,6 +72,7 @@ class Explainer:
         Do not include anything the USER has not asked for.
         """,
         )
+        # Initialize the chain with the LLM and prompt
         if embedding is not None:
             self.chain = ConversationalRetrievalChain.from_llm(
                 llm=self.llm,
@@ -87,7 +89,6 @@ class Explainer:
 
         # Path to the 'qaoa' folder next to it
         folder_path = script_dir / "qaoa"
-        # folder_path = Path(r"C:\Users\sanne\QAOA_Sanne\qaoa")
 
         # Only get .py files for docstring extraction
         py_file_paths = [
@@ -96,16 +97,10 @@ class Explainer:
 
         return py_file_paths
 
-    # def set_context(self):
-    #     """Set or update the context variable with documentation."""
-    #     self.context = load_context(self.file_path())
-
     def explain(self, question):
         """Generate an explanation using the specified context chunk."""
+        # Invoke the chain with the question and context
         result = self.chain.invoke({"question": question, "context": self.context})
-        # print("\nRetrieved Documents:")
-        # for i, doc in enumerate(result["source_documents"]):
-        #     print(f"\n--- Document {i} ---\n{doc.page_content}")
         if self.embedding is not None:
             return result.get("answer", result)
         else:
