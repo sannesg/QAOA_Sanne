@@ -6,7 +6,7 @@ from langchain.chat_models import init_chat_model
 
 # ----- Helper imports -----
 from explainer import Explainer
-from codeassistant import Coder
+from coder import Coder
 
 class Planner:
     """
