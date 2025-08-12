@@ -18,15 +18,19 @@ from langchain.chains import ConversationalRetrievalChain
 # ----- Helper imports -----
 from agent_utils import SaveEmbedding
 
-
 class Coder:
-    def __init__(self, memory = None, context_files: Optional[list[Union[str, Path]]] = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]):
-        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        self.tools = [self.execute_code]
-
-        if memory is not None:
+    """
+    A coding assistant that generates, executes, and improves Python code based on user queries.
+    
+    This class uses a conversational retrieval chain to maintain context and memory of previous interactions.
+    It can generate code, analyze errors, and improve code based on feedback.
+    It also captures media outputs from executed code for rendering in a chat interface.
+    """
+    def __init__(self, memory = None, context_files: Optional[list[Union[str, Path]]] = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"], model:str="gpt-4o-mini"):
+        self.llm = ChatOpenAI(model=model, temperature=0) # LLM.
+        if memory is not None: # If a memory object is provided, use it (for sharing memory between instances).
             self.memory = memory
-        else:
+        else: # If no memory is provided, create a new memory object.
             self.memory = ConversationSummaryBufferMemory(
                 llm=self.llm,
                 memory_key="chat_history",  # See prompt template for usage
@@ -34,10 +38,7 @@ class Coder:
                 return_messages=True,
                 max_token_limit=1000,  # Limit memory size to avoid excessive context
             )
-        # self.vectorstore = None
-        # if context_files:
-        #     self.context = agent_utils.load_context(context_files)
-        #     self.vectorstore = agent_utils.process_documents(self.context)
+        # Initialize vector store and retriever for context files (saved locally in embeddings to save tokens).
         embedding = SaveEmbedding(context_files, "Coder_embedding", "embeddings/Coder_embedding", "embeddings/Coder_cache")
         self.vectorstore = embedding.get_vectorstore()
         self.retriever = embedding.get_retriever()
@@ -65,12 +66,10 @@ class Coder:
             # Return just the error type and message, not full traceback
             return f"ERROR: {type(e).__name__}: {str(e)}"
 
-    def _initialize_agent(
-        self, context_files: Optional[list[Union[str, Path]]] = None
-    ) -> None:
+    def _initialize_agent(self) -> None:
         """Initialize and return the agent executor."""
 
-        code_suggestion_prompt = PromptTemplate(
+        code_suggestion_prompt = PromptTemplate( # Prompt!!!
             input_variables=["context", "question"],
             template="""You are a AI, a Python coding assistant. 
             
@@ -121,17 +120,16 @@ In this case, try to find the variable that is updated and suggest using this in
             },
         )
 
-    # Main function
+    # Main function.
     def generate_and_test_code(self, query: str, max_iterations: int = 3) -> None:
         """Generate code, test it, and improve based on feedback."""
         current_code = None
         error_analysis = None
-        # last_error = None
 
-        for iteration in range(max_iterations):
+        for iteration in range(max_iterations): # Iterate up to max_iterations.
             print(f"\033[90m\n--- Iteration {iteration + 1} ---\033[0m")
 
-            # Generate new or improve old code
+            # Generate new or improve old code.
             if current_code is None:
                 print("\033[90m\nGenerating initial response...\033[0m")
                 result = self.qa_chain.invoke({"question": query})
@@ -143,16 +141,16 @@ In this case, try to find the variable that is updated and suggest using this in
                     }
                 )
 
-            current_code = result["answer"]  # Extract response text
+            current_code = result["answer"]  # Extract response text.
 
             print("\033[90m\nResponse:\033[0m")
             print(f"\033[90m\n{current_code}\033[0m")
 
-            # Execute the code if it contains a code block
+            # Execute the code if it contains a code block.
             if "```" in current_code:
                 matplotlib.use(
                     "Agg"
-                )  # Use a non-interactive backend for matplotlib (no verbose output in console)
+                )  # Use a non-interactive backend for matplotlib (no verbose output in console).
                 print("\033[96m\nExecuting code...\033[0m")
                 execution_result = self.execute_code(
                     self._extract_code_block(current_code)
@@ -170,13 +168,13 @@ In this case, try to find the variable that is updated and suggest using this in
                     error_analysis = result["answer"]
                     print(f"\033[96mError analysis: {error_analysis}\033[0m")
                 else:
-                    return current_code  # Return the response if no errors occurred
+                    return current_code  # Return the response if no errors occurred.
 
-            else:
+            else: # If no code block is found, just return the response (nothing to test, we just trust it).
                 return current_code
 
         print(f"\nReached maximum iterations ({max_iterations})")
-        return current_code  # Return the last generated response when max tries are reached
+        return current_code  # Return the last generated response when max tries are reached.
 
     def _extract_code_block(self, text: str) -> str:
         """Extract code from markdown block."""
@@ -188,11 +186,11 @@ In this case, try to find the variable that is updated and suggest using this in
 
 if __name__ == "__main__":
 
-    # Example usage
+    # Example usage.
     context_files = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]
     assistant = Coder(context_files)
 
-    # First query
+    # First query.
     query1 = "Create a qaoa instance using onehot encoding."
     print("\nFirst query: ")
     print(f"\033[1m{query1}\033[0m")
@@ -200,7 +198,7 @@ if __name__ == "__main__":
     print("\nFinal response to first query:")
     print(f"\033[1m{final_code1}\033[0m")
 
-    # Second query relies on memory of the first one
+    # Second query relies on memory of the first one.
     # query2 = "Why did you choose the initial state and mixer like that?"
     # print("\nSecond query: ")
     # print(f"\033[1m{query2}\033[0m")
@@ -208,7 +206,7 @@ if __name__ == "__main__":
     # print("\nFinal response to second query:")
     # print(f"\033[1m{final_response2["answer"]}\033[0m")
 
-    # # Third query
+    # # Third query.
     # query3 = """Create a qaoa circuit solving the max k-cut problem with k = 3 for this 10-node graph using binary encoding and the full hamiltonian:
     #     graph [
     # node [
