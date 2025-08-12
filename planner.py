@@ -3,8 +3,6 @@ from langchain.chains import LLMChain
 from langchain.memory import ConversationSummaryBufferMemory
 from langchain.chat_models import init_chat_model
 
-
-# ----- Class imports -----
 from explainer import Explainer
 from codeassistant import CodeAssistant
 
