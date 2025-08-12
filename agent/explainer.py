@@ -5,7 +5,7 @@ from langchain.chat_models import init_chat_model
 import os
 
 # ----- Helper imports -----
-from agent_utils import SaveEmbedding
+from saveembedding import SaveEmbedding
 from pathlib import Path
 
 
