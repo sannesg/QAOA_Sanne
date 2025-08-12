@@ -1,42 +1,25 @@
-# Load API key
+# ----- Load API key ------
 from dotenv import load_dotenv
-
 load_dotenv()
 
-from agent_utils import SaveEmbedding
-
-import json
 import re
 from pathlib import Path
-from typing import Dict, Any, List, Union, Optional
+from typing import Union, Optional
 import io
-import sys
 from contextlib import redirect_stdout, redirect_stderr
-import traceback
 import matplotlib
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
-from langchain.tools import tool
+# ----- LangChain imports -----
+from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from langchain.memory import (
-    ConversationBufferMemory,
-    ConversationSummaryMemory,
-    ConversationSummaryBufferMemory,
-)
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.docstore.document import Document
+from langchain.memory import ConversationSummaryBufferMemory
+from langchain.chains import ConversationalRetrievalChain
 
-from langchain.agents import initialize_agent, AgentType, AgentExecutor
-from langchain.chains import ConversationalRetrievalChain, RetrievalQA, LLMChain
-
-from langchain_community.vectorstores import FAISS
-
-# from langchain_community.embeddings import OpenAIEmbeddings
-# from langchain_community.document_loaders import DirectoryLoader
+# ----- Helper imports -----
+from agent_utils import SaveEmbedding
 
 
-class CodeAssistant:
+class Coder:
     def __init__(self, memory = None, context_files: Optional[list[Union[str, Path]]] = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]):
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
         self.tools = [self.execute_code]
@@ -55,7 +38,7 @@ class CodeAssistant:
         # if context_files:
         #     self.context = agent_utils.load_context(context_files)
         #     self.vectorstore = agent_utils.process_documents(self.context)
-        embedding = SaveEmbedding(context_files, "CodeAssistant_embedding", "embeddings/CodeAssistant_embedding", "embeddings/CodeAssistant_cache")
+        embedding = SaveEmbedding(context_files, "Coder_embedding", "embeddings/Coder_embedding", "embeddings/Coder_cache")
         self.vectorstore = embedding.get_vectorstore()
         self.retriever = embedding.get_retriever()
         self.context = embedding.get_context()
@@ -207,7 +190,7 @@ if __name__ == "__main__":
 
     # Example usage
     context_files = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]
-    assistant = CodeAssistant(context_files)
+    assistant = Coder(context_files)
 
     # First query
     query1 = "Create a qaoa instance using onehot encoding."

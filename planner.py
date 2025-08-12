@@ -1,19 +1,16 @@
+# ----- Imports -----
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.memory import ConversationSummaryBufferMemory
 from langchain.chat_models import init_chat_model
 
-
-# ----- Class imports -----
+# ----- Helper imports -----
 from explainer import Explainer
-from codeassistant import CodeAssistant
-
-# from agent_coder_dina import CodeAssistant
-
+from coder import Coder
 
 class Planner:
     """
-    A planning agent that generates plans for QAOA code or explanations based on user input.
+    A planning agent that generates plans for QAOA code or explanations based on user input. It then sends the plan to either the Explainer or Coder agent for further processing.
 
     Attributes:
         model (str): The language model to use for planning. Default is "gpt-4.1".
@@ -33,8 +30,8 @@ class Planner:
             model (str): The language model to use for planning. Default is "gpt-4.1".
             temperature (float): The temperature for the language model. Default is 0.
         """
+        # Initialize the language model
         self.llm = init_chat_model("openai:gpt-4.1", temperature=0)
-        # TODO add vectorstore and embedding
         self.memory = ConversationSummaryBufferMemory(
             llm=self.llm,
             memory_key="chat_history",
@@ -114,7 +111,7 @@ Remember: Be concise, focused, and precise.
         )
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt, memory=self.memory)
 
-        # Initialize the other agents Explainer and CodeAssistant with context files
+        # Initialize the other agents Explainer and Coder with context files
         self.other_memory = ConversationSummaryBufferMemory(
             llm=self.llm,
             memory_key="chat_history",
@@ -122,17 +119,24 @@ Remember: Be concise, focused, and precise.
             return_messages=True,
             max_token_limit=1000,
         )
+        
+        # Initialize the Explainer and Coder with the same memory
         self.explainer = Explainer(self.other_memory, embedding=True)
-        self.codeassistant = CodeAssistant(self.other_memory)
+        self.coder = Coder(self.other_memory)
 
     def plan(self, description: str) -> str:
         """Generate a plan based on the user description and stored context."""
         result = self.chain.invoke(
             {"question": description, "context": self.context}
         )
+        # Extract the plan from the result
         plan = result["text"]
         low_plan = plan.lower()
+
+        # The next query to send to the Explainer or Coder
         next_query = "Input from USER: " + description + "\n\nPlan:\n" + plan
+        
+        # Print the plan for debugging and better control
         print("Plan generated:", plan)
         try:
             # Check for specific cases in the response to determine whether to use an agent (or not), if agent then which agent to use
@@ -142,13 +146,17 @@ Remember: Be concise, focused, and precise.
                 or "plan over which components" in low_plan
             ):
                 print("using the Explainer agent")
+                
+                # Use the Explainer agent to explain the QAOA package
                 response = self.explainer.explain(next_query)
             elif "case 0" in low_plan or "not a valid option" in low_plan:
+                # If the plan indicates an invalid option, return a direct response
                 print("not using an agent, returning response directly")
                 response = plan
             else:
-                print("using the CodeAssistant agent")
-                response = self.codeassistant.generate_and_test_code(next_query)
+                # Use the Coder agent to generate code based on the plan
+                print("using the Coder agent")
+                response = self.coder.generate_and_test_code(next_query)
             # print("Memory buffer:", self.memory.buffer)
             return response
         except Exception as e:
@@ -161,13 +169,16 @@ Remember: Be concise, focused, and precise.
 
     def set_context(self):
         """Set or update the context variable."""
-        filepath = "valid_initialstates_problems_mixers.txt"  # or use os.path.join(repo_path, "class_structure.txt")
+        
+        # Load context from a file listing valid initial states, problems, and mixers
+        filepath = "valid_initialstates_problems_mixers.txt"  
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 self.context = f.read()
         except FileNotFoundError:
             self.context = "No context available."
 
+# Run planner.py to start the interaction if an interface is not wanted.
 if __name__ == "__main__":
     planner = Planner()
     while True:
