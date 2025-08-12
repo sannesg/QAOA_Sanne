@@ -38,14 +38,14 @@ class Planner:
         self.memory = ConversationSummaryBufferMemory(
             llm=self.llm,
             memory_key="chat_history",
-            input_key="description",
+            input_key="question",
             return_messages=True,
             max_token_limit=1000,
         )
         self.context = ""
         self.set_context()
         self.prompt = PromptTemplate(
-            input_variables=["description", "context", "chat_history"],
+            input_variables=["question", "context", "chat_history"],
             template="""
 You are an expert in the QAOA Python package and a code assistant to the USER. Your task is to create a plan (a prompt) for another AGENT to follow.
 
@@ -56,7 +56,7 @@ You have access to the following context: {context}, which contains the valid op
 
 You have also access to the chat history: {chat_history}
 
-Given the USER's input: "{description}":
+Given the USER's input: "{question}":
 
 ***** RULES *****
 ONLY do 1 of the following 3 cases:
@@ -76,18 +76,12 @@ Example of CASE 0:
 1. If the USER requests specific code or how to implement QAOA, generate a numbered list of concise, implementation-focused steps to create a Python script using only the QAOA package and only valid intial states/mixers/problems which are explicitly written in the context. 
  - The title above the steps are ALWAYS "CASE 1: Plan to generate code using the QAOA package".
  - Do NOT write any code or call any tools.  
- - Only describe how to do each step.  
- - Generate the numbered steps using either the user-specified or default components (Default for each component if missing in the {description}: problem = MaxkCutPowerofTwo, mixer = X, initial state = Plus).
+ - Only describe how to do each step.
 
     The step template you will use if CASE 1 is selected:
-        1. Import the necessary libraries such as qaoa, matplotlib, numpy, and networkx.
-        2. Make a graph using networkx. Default to a complete graph with 4 nodes if not specified.
-        3. Choose the problem.
-        4. Choose the mixer.
-        5. Choose the initial state. 
-        6. Create an instance of the QAOA class with the chosen initial state, problem, and mixer.
+        1. Answer this query: {question}
  
- - ALWAYS include the steps 1-6 if CASE 1 applies.
+ - ALWAYS include the steps 1 if CASE 1 applies.
  - IF the USER asks for a visualization, include a step that asks for this. If the USER asks for something specific to the visualization, include a step that asks for this.
  - IF the USER asks for a cost landscape, include a step that asks for this. 
 
@@ -121,13 +115,20 @@ Remember: Be concise, focused, and precise.
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt, memory=self.memory)
 
         # Initialize the other agents Explainer and CodeAssistant with context files
-        self.explainer = Explainer(embedding=True)
-        self.codeassistant = CodeAssistant()
+        self.other_memory = ConversationSummaryBufferMemory(
+            llm=self.llm,
+            memory_key="chat_history",
+            input_key="question",
+            return_messages=True,
+            max_token_limit=1000,
+        )
+        self.explainer = Explainer(self.other_memory, embedding=True)
+        self.codeassistant = CodeAssistant(self.other_memory)
 
     def plan(self, description: str) -> str:
         """Generate a plan based on the user description and stored context."""
         result = self.chain.invoke(
-            {"description": description, "context": self.context}
+            {"question": description, "context": self.context}
         )
         plan = result["text"]
         low_plan = plan.lower()

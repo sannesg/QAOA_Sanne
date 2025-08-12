@@ -37,16 +37,20 @@ from langchain_community.vectorstores import FAISS
 
 
 class CodeAssistant:
-    def __init__(self, context_files: Optional[list[Union[str, Path]]] = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]):
-        self.llm = ChatOpenAI(model="gpt-4", temperature=0)
+    def __init__(self, memory = None, context_files: Optional[list[Union[str, Path]]] = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"]):
+        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
         self.tools = [self.execute_code]
-        self.memory = ConversationSummaryBufferMemory(
-            llm=self.llm,
-            memory_key="chat_history",  # See prompt template for usage
-            input_key="question",
-            return_messages=True,
-            max_token_limit=1000,  # Limit memory size to avoid excessive context
-        )
+
+        if memory is not None:
+            self.memory = memory
+        else:
+            self.memory = ConversationSummaryBufferMemory(
+                llm=self.llm,
+                memory_key="chat_history",  # See prompt template for usage
+                input_key="question",
+                return_messages=True,
+                max_token_limit=1000,  # Limit memory size to avoid excessive context
+            )
         # self.vectorstore = None
         # if context_files:
         #     self.context = agent_utils.load_context(context_files)

@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 class Explainer:
-    def __init__(self, embedding=None):
+    def __init__(self, memory=None, embedding=None):
         """
         Initialize the Explainer with the context for QAOA package components.
 
@@ -45,12 +45,14 @@ class Explainer:
             self.context = make_or_get_embedding.get_context()
         # else:
         # self.set_context()
-
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            input_key="question",
-            return_messages=True,
-        )
+        if memory is not None:
+            self.memory = memory
+        else: 
+            self.memory = ConversationBufferMemory(
+                memory_key="chat_history",
+                input_key="question",
+                return_messages=True,
+            )
         self.prompt = PromptTemplate(
             input_variables=["question", "context", "chat_history"],
             template="""
