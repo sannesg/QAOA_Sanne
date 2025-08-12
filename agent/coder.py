@@ -16,7 +16,10 @@ from langchain.memory import ConversationSummaryBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 
 # ----- Helper imports -----
-from agent_utils import SaveEmbedding
+from embeddings import SaveEmbedding
+
+repo_root = Path(__file__).resolve().parent
+DEFAULT_CONTEXT = [repo_root+"/examples/MaxCut/KCutExamples.ipynb", repo_root+"/qaoa/qaoa.py"]
 
 class Coder:
     """
@@ -26,7 +29,7 @@ class Coder:
     It can generate code, analyze errors, and improve code based on feedback.
     It also captures media outputs from executed code for rendering in a chat interface.
     """
-    def __init__(self, memory = None, context_files: Optional[list[Union[str, Path]]] = ["./examples/MaxCut/KCutExamples.ipynb", "./qaoa/qaoa.py"], model:str="gpt-4o-mini"):
+    def __init__(self, memory = None, context_files: Optional[list[Union[str, Path]]] = DEFAULT_CONTEXT, model:str="gpt-4o-mini"):
         self.llm = ChatOpenAI(model=model, temperature=0) # LLM.
         if memory is not None: # If a memory object is provided, use it (for sharing memory between instances).
             self.memory = memory
