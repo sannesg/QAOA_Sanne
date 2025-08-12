@@ -23,15 +23,15 @@ class Planner:
         set_context(): Sets or updates the context variable with relevant documentation.
     """
 
-    def __init__(self):
+    def __init__(self, model="openai:gpt-4.1", temperature=0):
         """Initialize the planning agent with an LLM, a planning prompt, and optional context.
 
         Args:
-            model (str): The language model to use for planning. Default is "gpt-4.1".
+            model (str): The language model to use for planning. Default is "openai:gpt-4.1".
             temperature (float): The temperature for the language model. Default is 0.
         """
         # Initialize the language model
-        self.llm = init_chat_model("openai:gpt-4.1", temperature=0)
+        self.llm = init_chat_model(model, temperature=temperature)
         self.memory = ConversationSummaryBufferMemory(
             llm=self.llm,
             memory_key="chat_history",

@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 class Explainer:
-    def __init__(self, memory=None, embedding=None):
+    def __init__(self, memory=None, embedding=None, model="openai:gpt-4.1", temperature=0):
         """
         Initialize the Explainer with the context for QAOA package components.
 
@@ -19,7 +19,7 @@ class Explainer:
             model (str): The language model to use.
             temperature (float): The temperature for the language model.
         """
-        self.llm = init_chat_model("openai:gpt-4.1", temperature=0)
+        self.llm = init_chat_model(model, temperature=temperature)
         file_path = self.file_path()
         self.embedding = embedding
         self.context = ""
