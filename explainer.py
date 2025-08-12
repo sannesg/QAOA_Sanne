@@ -106,9 +106,3 @@ class Explainer:
         else:
             return result.get("text", result)
 
-
-"""
-explainer = Explainer()
-result = explainer.explain("QAOA class, Problems classes, Mixers classes, Initial states classes")
-print(result)
-"""
