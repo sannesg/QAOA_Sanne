@@ -85,7 +85,7 @@ class Explainer:
 
     def file_path(self):
         """Set or update the context variable with documentation."""
-        script_dir = Path(__file__).resolve().parent
+        script_dir = Path(__file__).resolve().parent.parent
 
         # Path to the 'qaoa' folder next to it
         folder_path = script_dir / "qaoa"
