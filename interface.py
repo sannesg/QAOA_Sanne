@@ -1,4 +1,6 @@
 import streamlit as st # Framework for building web applications in Python.
+# RUN THIS FILE WITH STREAMLIT: `streamlit run interface.py`
+
 import re
 import matplotlib
 matplotlib.use("Agg") # Use non-interactive backend (prevents popups while running in Streamlit).
