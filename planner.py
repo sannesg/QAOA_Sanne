@@ -6,7 +6,7 @@ from langchain.chat_models import init_chat_model
 
 # ----- Helper imports -----
 from explainer import Explainer
-from codeassistant import CodeAssistant
+from codeassistant import Coder
 
 class Planner:
     """
@@ -111,7 +111,7 @@ Remember: Be concise, focused, and precise.
         )
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt, memory=self.memory)
 
-        # Initialize the other agents Explainer and CodeAssistant with context files
+        # Initialize the other agents Explainer and Coder with context files
         self.other_memory = ConversationSummaryBufferMemory(
             llm=self.llm,
             memory_key="chat_history",
@@ -120,9 +120,9 @@ Remember: Be concise, focused, and precise.
             max_token_limit=1000,
         )
         
-        # Initialize the Explainer and CodeAssistant with the same memory
+        # Initialize the Explainer and Coder with the same memory
         self.explainer = Explainer(self.other_memory, embedding=True)
-        self.codeassistant = CodeAssistant(self.other_memory)
+        self.coder = Coder(self.other_memory)
 
     def plan(self, description: str) -> str:
         """Generate a plan based on the user description and stored context."""
@@ -133,7 +133,7 @@ Remember: Be concise, focused, and precise.
         plan = result["text"]
         low_plan = plan.lower()
 
-        # The next query to send to the Explainer or CodeAssistant
+        # The next query to send to the Explainer or Coder
         next_query = "Input from USER: " + description + "\n\nPlan:\n" + plan
         
         # Print the plan for debugging and better control
@@ -156,7 +156,7 @@ Remember: Be concise, focused, and precise.
             else:
                 # Use the Coder agent to generate code based on the plan
                 print("using the Coder agent")
-                response = self.codeassistant.generate_and_test_code(next_query)
+                response = self.coder.generate_and_test_code(next_query)
             # print("Memory buffer:", self.memory.buffer)
             return response
         except Exception as e:
