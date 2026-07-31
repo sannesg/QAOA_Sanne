@@ -509,7 +509,7 @@ class QAOA:
                 self.parameterized_circuit.barrier()
 
             if self.usebarrier:
-                self.circuit.barrier()
+                self.parameterized_circuit.barrier()
 
         self.parameterized_circuit.barrier()
         self.parameterized_circuit.measure(q, c)
