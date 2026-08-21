@@ -55,3 +55,53 @@ class Tensor(InitialState):
         n = self.subcircuit.N_qubits
         for i in range(self.num):
             self.circuit.append(sub_instr, list(range(i * n, (i + 1) * n)))
+
+    #     print("Subcircuit parameters:", self.subcircuit.circuit.parameters, id(self.subcircuit.circuit.parameters))
+    #     print("Tensor parameters:", self.circuit.parameters, id(self.circuit.parameters))
+
+    #     sub_param = next(iter(self.subcircuit.circuit.parameters))
+    #     tensor_param = next(iter(self.circuit.parameters))
+
+    #     print("sub:", sub_param)
+    #     print("tensor:", tensor_param)
+
+    #     print("== :", sub_param == tensor_param)
+    #     print("is :", sub_param is tensor_param)
+
+
+    # def create_circuit(self) -> None:
+    #     self.subcircuit.create_circuit()
+
+    #     qr = QuantumRegister(self.N_qubits, name="q")
+    #     self.circuit = QuantumCircuit(qr)
+
+    #     n = self.subcircuit.N_qubits
+
+    #     for i in range(self.num):
+    #         # Make a copy of the subcircuit
+    #         new_circuit = self.subcircuit.circuit.assign_parameters(
+    #             {
+    #                 next(iter(self.subcircuit.circuit.parameters)):
+    #                 self.subcircuit.mixer_param
+    #             },
+    #             inplace=False,
+    #         )
+
+    #         self.circuit.compose(
+    #             new_circuit,
+    #             qubits=list(range(i * n, (i + 1) * n)),
+    #             inplace=True,
+    #         )
+
+    #     print("Subcircuit parameters:", self.subcircuit.circuit.parameters, id(self.subcircuit.circuit.parameters))
+    #     print("Tensor parameters:", self.circuit.parameters, id(self.circuit.parameters))
+
+    #     sub_param = next(iter(self.subcircuit.circuit.parameters))
+    #     tensor_param = next(iter(self.circuit.parameters))
+
+    #     print("sub:", sub_param)
+    #     print("tensor:", tensor_param)
+
+    #     print("== :", sub_param == tensor_param)
+    #     print("is :", sub_param is tensor_param)
+

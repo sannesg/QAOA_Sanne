@@ -271,7 +271,9 @@ class QAOA:
         self.problem = problem
         self.mixer = mixer
         self.initialstate = initialstate
+        # if self.initialstate.N_qubits != self.problem.N_qubits:
         self.initialstate.setNumQubits(self.problem.N_qubits)
+        # if self.mixer.N_qubits != self.problem.N_qubits:
         self.mixer.setNumQubits(self.problem.N_qubits)
 
         self.parameterized_circuit = None
@@ -455,6 +457,7 @@ class QAOA:
         self.n_gamma = self.problem.get_num_parameters()
         self.n_beta = self.mixer.get_num_parameters()
         self.n_init = self.initialstate.get_num_parameters()
+
 
         a = AncillaRegister(self.problem.N_ancilla_qubits)
         q = QuantumRegister(self.problem.N_qubits)
@@ -659,6 +662,7 @@ class QAOA:
 
                 logger.info("Executing sample_cost_landscape")
                 logger.info(f"circuits: {len(bound_circuits)}")
+
                 job = self.backend.run(
                     bound_circuits,
                     noise_model=self.noisemodel,

@@ -2,6 +2,12 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import MaxNLocator
 import networkx as nx
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from save_data.save_data import save_landscape_csv
 
 import numpy as np
 from math import comb
@@ -90,14 +96,14 @@ def _plot_landscape(A, extent, fig=None, title=None):
     ax.set_xlabel(r"$\gamma$")
     ax.set_ylabel(r"$\beta$")
     ax.set_title(title if title else "Expectation value")
-    im = ax.imshow(A, interpolation="bicubic", origin="lower", extent=extent)
+    im = ax.imshow(A, interpolation="nearest", origin="lower", extent=extent)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(im, cax=cax)
     return fig, ax
 
 
-def plot_E(qaoa_instance, fig=None, title=None):
+def plot_E(qaoa_instance, output_dir=None, fig=None, title=None):
     """Plot the sampled expectation-value landscape at depth *p = 1*.
 
     Args:
@@ -115,7 +121,15 @@ def plot_E(qaoa_instance, fig=None, title=None):
         angles["beta"][0],
         angles["beta"][1],
     ]
-    return _plot_landscape(qaoa_instance.exp_landscape(), extent, fig=fig, title=title)
+    A = qaoa_instance.exp_landscape()
+    if output_dir != None:
+        save_landscape_csv(
+            A,
+            extent,
+            output_dir,
+            filename="expectation_landscape.csv"
+        )
+    return _plot_landscape(A, extent, fig=fig, title=title)
 
 
 def plot_Var(qaoa_instance, fig=None, title=None):
