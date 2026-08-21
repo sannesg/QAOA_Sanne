@@ -19,8 +19,6 @@ setup(
         "matplotlib",
         "networkx",
         "jupyter",
-        "qiskit>=2.3.0",
-        "qiskit-aer>=0.17.0",
         "qiskit-algorithms>=0.4.0",
         "qiskit-finance",
         "pylatexenc",
