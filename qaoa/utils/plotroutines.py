@@ -96,7 +96,7 @@ def _plot_landscape(A, extent, fig=None, title=None):
     ax.set_xlabel(r"$\gamma$")
     ax.set_ylabel(r"$\beta$")
     ax.set_title(title if title else "Expectation value")
-    im = ax.imshow(A, interpolation="nearest", origin="lower", extent=extent)
+    im = ax.imshow(A, interpolation="bicubic", origin="lower", extent=extent)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(im, cax=cax)
